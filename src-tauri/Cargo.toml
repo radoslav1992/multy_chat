@@ -1,0 +1,45 @@
+[package]
+name = "multi-model-chat"
+version = "0.1.0"
+description = "A modern multi-model AI chat application"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "multi_model_chat_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-store = "2"
+tauri-plugin-http = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "stream"] }
+futures = "0.3"
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2"
+anyhow = "1"
+async-trait = "0.1"
+base64 = "0.22"
+lopdf = "0.34"
+zip = "2"
+fastembed = "4"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

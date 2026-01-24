@@ -1,0 +1,160 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import 'highlight.js/styles/github-dark.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 33% 98%;
+    --foreground: 240 10% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 10%;
+    --primary: 262 52% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 40 50% 93%;
+    --secondary-foreground: 240 10% 10%;
+    --muted: 40 20% 94%;
+    --muted-foreground: 240 5% 46%;
+    --accent: 330 65% 60%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 40 20% 88%;
+    --input: 40 20% 88%;
+    --ring: 262 52% 55%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 240 10% 8%;
+    --foreground: 40 20% 95%;
+    --card: 240 10% 12%;
+    --card-foreground: 40 20% 95%;
+    --popover: 240 10% 12%;
+    --popover-foreground: 40 20% 95%;
+    --primary: 262 52% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 10% 18%;
+    --secondary-foreground: 40 20% 95%;
+    --muted: 240 10% 18%;
+    --muted-foreground: 40 10% 60%;
+    --accent: 330 65% 55%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 10% 20%;
+    --input: 240 10% 20%;
+    --ring: 262 52% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/20 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/40;
+}
+
+/* Syntax highlighting theme adjustments */
+.hljs {
+  @apply bg-muted/50 rounded-lg p-4;
+}
+
+/* Mermaid diagram styling */
+.mermaid {
+  @apply flex justify-center items-center p-4;
+}
+
+/* Markdown content styling */
+.markdown-content {
+  @apply leading-relaxed;
+}
+
+.markdown-content h1 {
+  @apply text-2xl font-bold mt-6 mb-4;
+}
+
+.markdown-content h2 {
+  @apply text-xl font-semibold mt-5 mb-3;
+}
+
+.markdown-content h3 {
+  @apply text-lg font-medium mt-4 mb-2;
+}
+
+.markdown-content p {
+  @apply my-3;
+}
+
+.markdown-content ul, .markdown-content ol {
+  @apply my-3 ml-6;
+}
+
+.markdown-content li {
+  @apply my-1;
+}
+
+.markdown-content ul {
+  @apply list-disc;
+}
+
+.markdown-content ol {
+  @apply list-decimal;
+}
+
+.markdown-content blockquote {
+  @apply border-l-4 border-primary/50 pl-4 my-4 italic text-muted-foreground;
+}
+
+.markdown-content a {
+  @apply text-primary underline underline-offset-2 hover:text-primary/80;
+}
+
+.markdown-content table {
+  @apply w-full border-collapse my-4;
+}
+
+.markdown-content th, .markdown-content td {
+  @apply border border-border px-4 py-2 text-left;
+}
+
+.markdown-content th {
+  @apply bg-muted font-semibold;
+}
+
+.markdown-content code:not(pre code) {
+  @apply bg-muted px-1.5 py-0.5 rounded text-sm font-mono;
+}
+
+.markdown-content pre {
+  @apply my-4 overflow-x-auto;
+}
+
+.markdown-content hr {
+  @apply my-6 border-border;
+}
