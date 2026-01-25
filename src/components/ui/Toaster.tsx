@@ -121,7 +121,11 @@ export function useToast() {
   return context;
 }
 
-export function Toaster() {
+type ToastProviderRootProps = {
+  children?: React.ReactNode;
+};
+
+export function ToastProviderRoot({ children }: ToastProviderRootProps) {
   const [toasts, setToasts] = React.useState<(ToastProps & { id: number })[]>([]);
 
   const toast = React.useCallback((props: ToastProps) => {
@@ -135,6 +139,7 @@ export function Toaster() {
   return (
     <ToastContext.Provider value={{ toast }}>
       <ToastProvider>
+        {children}
         {toasts.map((t) => (
           <Toast key={t.id} variant={t.variant}>
             <div className="grid gap-1">
@@ -148,6 +153,10 @@ export function Toaster() {
       </ToastProvider>
     </ToastContext.Provider>
   );
+}
+
+export function Toaster() {
+  return <ToastProviderRoot />;
 }
 
 export { ToastProvider, ToastViewport, Toast, ToastTitle, ToastDescription, ToastClose, ToastAction };

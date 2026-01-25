@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { User, Copy, Check, RotateCcw } from "lucide-react";
+import { User, Copy, Check, RotateCcw, ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { Message } from "@/stores/chatStore";
 import { MarkdownRenderer } from "@/components/preview/MarkdownRenderer";
@@ -19,7 +19,9 @@ export function MessageBubble({
   onRegenerate,
 }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
+  const [showSources, setShowSources] = useState(false);
   const isUser = message.role === "user";
+  const sources = message.sources ?? [];
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content);
@@ -87,6 +89,42 @@ export function MessageBubble({
             <MarkdownRenderer content={message.content} />
           )}
         </div>
+
+        {/* Sources */}
+        {!isUser && sources.length > 0 && (
+          <div className="rounded-lg border border-border bg-muted/30 text-xs">
+            <button
+              className="w-full flex items-center justify-between px-3 py-2 text-muted-foreground hover:text-foreground"
+              onClick={() => setShowSources((prev) => !prev)}
+            >
+              <span>Sources ({sources.length})</span>
+              {showSources ? (
+                <ChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
+              )}
+            </button>
+            {showSources && (
+              <div className="px-3 pb-3 space-y-2">
+                {sources.map((source, index) => (
+                  <div key={`${source.filename}-${index}`} className="space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-foreground truncate">
+                        {source.filename}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {(source.score * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground whitespace-pre-wrap">
+                      {source.content}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Actions */}
         {!isUser && (

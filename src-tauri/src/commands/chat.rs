@@ -12,6 +12,15 @@ pub struct Conversation {
     pub title: String,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(default)]
+    pub pinned: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SourceReference {
+    pub filename: String,
+    pub score: f32,
+    pub content: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -23,6 +32,8 @@ pub struct Message {
     pub provider: String,
     pub model: String,
     pub created_at: String,
+    #[serde(default)]
+    pub sources: Option<Vec<SourceReference>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -33,6 +44,7 @@ pub struct SendMessageRequest {
     pub model: String,
     pub api_key: String,
     pub context: Option<String>,
+    pub sources: Option<Vec<SourceReference>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -47,6 +59,7 @@ pub struct SearchConversationResult {
     pub title: String,
     pub updated_at: String,
     pub snippet: String,
+    pub pinned: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -56,6 +69,7 @@ pub struct RegenerateRequest {
     pub model: String,
     pub api_key: String,
     pub context: Option<String>,
+    pub sources: Option<Vec<SourceReference>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -63,6 +77,22 @@ pub struct RegenerateResponse {
     pub message: Message,
     pub conversation_id: String,
     pub replaced_message_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CompareRequest {
+    pub conversation_id: String,
+    pub provider: String,
+    pub model: String,
+    pub api_key: String,
+    pub context: Option<String>,
+    pub sources: Option<Vec<SourceReference>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CompareResponse {
+    pub message: Message,
+    pub conversation_id: String,
 }
 
 #[tauri::command]
@@ -82,6 +112,7 @@ pub async fn send_message(
         provider: request.provider.clone(),
         model: request.model.clone(),
         created_at: now.clone(),
+        sources: None,
     };
     
     db::save_message(&app, &user_message).await
@@ -135,6 +166,7 @@ pub async fn send_message(
         provider: request.provider.clone(),
         model: request.model.clone(),
         created_at: Utc::now().to_rfc3339(),
+        sources: request.sources.clone(),
     };
 
     db::save_message(&app, &assistant_message).await
@@ -209,6 +241,7 @@ pub async fn regenerate_last_assistant(
         provider: request.provider.clone(),
         model: request.model.clone(),
         created_at: Utc::now().to_rfc3339(),
+        sources: request.sources.clone(),
     };
 
     db::delete_message(&app, &last_assistant.id).await
@@ -224,6 +257,78 @@ pub async fn regenerate_last_assistant(
         message: assistant_message,
         conversation_id: request.conversation_id,
         replaced_message_id: last_assistant.id,
+    })
+}
+
+#[tauri::command]
+pub async fn compare_response(
+    app: AppHandle,
+    request: CompareRequest,
+) -> Result<CompareResponse, String> {
+    let messages = db::get_messages(&app, &request.conversation_id).await
+        .map_err(|e| format!("Failed to get messages: {}", e))?;
+
+    let last_user_index = messages
+        .iter()
+        .rposition(|m| m.role == "user")
+        .ok_or_else(|| "No user message to compare".to_string())?;
+
+    let mut provider_messages: Vec<ProviderMessage> = messages
+        .iter()
+        .take(last_user_index + 1)
+        .map(|m| ProviderMessage {
+            role: m.role.clone(),
+            content: m.content.clone(),
+        })
+        .collect();
+
+    if let Some(context) = &request.context {
+        if !context.is_empty() {
+            println!(
+                "[RAG] Adding knowledge context to comparison ({} chars)",
+                context.len()
+            );
+            provider_messages.insert(0, ProviderMessage {
+                role: "system".to_string(),
+                content: format!(
+                    "IMPORTANT: The user has provided documents in their knowledge base. \
+                    You MUST use the following context from their documents to answer their question. \
+                    Base your answer on this context - do not give generic advice. \
+                    If the context doesn't contain relevant information, say so.\n\n\
+                    === KNOWLEDGE BASE CONTEXT ===\n{}\n=== END CONTEXT ===",
+                    context
+                ),
+            });
+        }
+    }
+
+    let provider = create_provider(&request.provider, &request.api_key)
+        .map_err(|e| format!("Failed to create provider: {}", e))?;
+
+    let response = provider.chat(provider_messages, &request.model).await
+        .map_err(|e| format!("Failed to get response: {}", e))?;
+
+    let assistant_message_id = Uuid::new_v4().to_string();
+    let assistant_message = Message {
+        id: assistant_message_id,
+        conversation_id: request.conversation_id.clone(),
+        role: "assistant".to_string(),
+        content: response,
+        provider: request.provider.clone(),
+        model: request.model.clone(),
+        created_at: Utc::now().to_rfc3339(),
+        sources: request.sources.clone(),
+    };
+
+    db::save_message(&app, &assistant_message).await
+        .map_err(|e| format!("Failed to save assistant message: {}", e))?;
+
+    db::update_conversation_timestamp(&app, &request.conversation_id).await
+        .map_err(|e| format!("Failed to update conversation: {}", e))?;
+
+    Ok(CompareResponse {
+        message: assistant_message,
+        conversation_id: request.conversation_id,
     })
 }
 
@@ -262,6 +367,7 @@ pub async fn create_conversation(app: AppHandle, title: String) -> Result<Conver
         title,
         created_at: now.clone(),
         updated_at: now,
+        pinned: false,
     };
     
     db::create_conversation(&app, &conversation).await
@@ -284,6 +390,16 @@ pub async fn update_conversation_title(
 ) -> Result<(), String> {
     db::update_conversation_title(&app, &conversation_id, &title).await
         .map_err(|e| format!("Failed to update conversation title: {}", e))
+}
+
+#[tauri::command]
+pub async fn update_conversation_pinned(
+    app: AppHandle,
+    conversation_id: String,
+    pinned: bool,
+) -> Result<(), String> {
+    db::update_conversation_pinned(&app, &conversation_id, pinned).await
+        .map_err(|e| format!("Failed to update conversation pinned: {}", e))
 }
 
 #[tauri::command]
@@ -328,6 +444,20 @@ pub async fn export_conversation_markdown(
         output.push('\n');
         output.push_str(&message.content);
         output.push_str("\n\n");
+
+        if let Some(sources) = &message.sources {
+            if !sources.is_empty() {
+                output.push_str("### Sources\n");
+                for source in sources {
+                    output.push_str(&format!(
+                        "- {} ({:.1}%)\n",
+                        source.filename,
+                        source.score * 100.0
+                    ));
+                }
+                output.push('\n');
+            }
+        }
     }
 
     std::fs::write(&file_path, output)

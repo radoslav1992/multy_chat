@@ -54,7 +54,12 @@ pub async fn create_conversation(app: &AppHandle, conversation: &Conversation) -
 pub async fn get_conversations(app: &AppHandle) -> Result<Vec<Conversation>> {
     let db = load_db(app);
     let mut conversations = db.conversations;
-    conversations.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    conversations.sort_by(|a, b| {
+        if a.pinned != b.pinned {
+            return b.pinned.cmp(&a.pinned);
+        }
+        b.updated_at.cmp(&a.updated_at)
+    });
     Ok(conversations)
 }
 
@@ -69,6 +74,18 @@ pub async fn update_conversation_title(app: &AppHandle, id: &str, title: &str) -
     let mut db = load_db(app);
     if let Some(conv) = db.conversations.iter_mut().find(|c| c.id == id) {
         conv.title = title.to_string();
+    }
+    save_db(app, &db)
+}
+
+pub async fn update_conversation_pinned(
+    app: &AppHandle,
+    id: &str,
+    pinned: bool,
+) -> Result<()> {
+    let mut db = load_db(app);
+    if let Some(conv) = db.conversations.iter_mut().find(|c| c.id == id) {
+        conv.pinned = pinned;
     }
     save_db(app, &db)
 }
@@ -130,6 +147,7 @@ pub async fn search_conversations(
                 title: conv.title.clone(),
                 updated_at: conv.updated_at.clone(),
                 snippet: "Title match".to_string(),
+                pinned: conv.pinned,
             });
             continue;
         }
@@ -143,13 +161,19 @@ pub async fn search_conversations(
                     title: conv.title.clone(),
                     updated_at: conv.updated_at.clone(),
                     snippet,
+                    pinned: conv.pinned,
                 });
                 break;
             }
         }
     }
 
-    results.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    results.sort_by(|a, b| {
+        if a.pinned != b.pinned {
+            return b.pinned.cmp(&a.pinned);
+        }
+        b.updated_at.cmp(&a.updated_at)
+    });
     Ok(results)
 }
 

@@ -9,6 +9,7 @@ export interface Message {
   provider: string;
   model: string;
   created_at: string;
+  sources?: SourceReference[];
 }
 
 export interface Conversation {
@@ -16,6 +17,7 @@ export interface Conversation {
   title: string;
   created_at: string;
   updated_at: string;
+  pinned?: boolean;
 }
 
 export interface ConversationSearchResult {
@@ -23,12 +25,24 @@ export interface ConversationSearchResult {
   title: string;
   updated_at: string;
   snippet: string;
+  pinned: boolean;
+}
+
+export interface SourceReference {
+  filename: string;
+  score: number;
+  content: string;
 }
 
 interface RegenerateResponse {
   message: Message;
   conversation_id: string;
   replaced_message_id: string;
+}
+
+interface CompareResponse {
+  message: Message;
+  conversation_id: string;
 }
 
 export type Provider = "anthropic" | "openai" | "gemini" | "deepseek";
@@ -49,13 +63,27 @@ interface ChatState {
   loadMessages: (conversationId: string) => Promise<void>;
   createConversation: (title?: string) => Promise<string>;
   deleteConversation: (id: string) => Promise<void>;
+  setConversationPinned: (id: string, pinned: boolean) => Promise<void>;
   selectConversation: (id: string) => Promise<void>;
-  sendMessage: (content: string, apiKey: string, context?: string) => Promise<void>;
+  sendMessage: (
+    content: string,
+    apiKey: string,
+    context?: string,
+    sources?: SourceReference[]
+  ) => Promise<void>;
   regenerateLastResponse: (
     apiKey: string,
     provider: Provider,
     model: string,
-    context?: string
+    context?: string,
+    sources?: SourceReference[]
+  ) => Promise<void>;
+  compareResponse: (
+    apiKey: string,
+    provider: Provider,
+    model: string,
+    context?: string,
+    sources?: SourceReference[]
   ) => Promise<void>;
   searchConversations: (query: string) => Promise<ConversationSearchResult[]>;
   exportConversation: (conversationId: string, filePath: string) => Promise<void>;
@@ -136,12 +164,32 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
+  setConversationPinned: async (id: string, pinned: boolean) => {
+    set((state) => ({
+      conversations: state.conversations.map((conversation) =>
+        conversation.id === id ? { ...conversation, pinned } : conversation
+      ),
+    }));
+
+    try {
+      await invoke("update_conversation_pinned", { conversationId: id, pinned });
+      await get().loadConversations();
+    } catch (error) {
+      set({ error: `Failed to update conversation pin: ${error}` });
+    }
+  },
+
   selectConversation: async (id: string) => {
     set({ currentConversationId: id });
     await get().loadMessages(id);
   },
 
-  sendMessage: async (content: string, apiKey: string, context?: string) => {
+  sendMessage: async (
+    content: string,
+    apiKey: string,
+    context?: string,
+    sources?: SourceReference[]
+  ) => {
     const { currentConversationId, selectedProvider, selectedModel } = get();
 
     if (!currentConversationId) {
@@ -177,6 +225,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             model: selectedModel,
             api_key: apiKey,
             context,
+            sources,
           },
         }
       );
@@ -205,7 +254,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     apiKey: string,
     provider: Provider,
     model: string,
-    context?: string
+    context?: string,
+    sources?: SourceReference[]
   ) => {
     const { currentConversationId } = get();
 
@@ -226,6 +276,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             model,
             api_key: apiKey,
             context,
+            sources,
           },
         }
       );
@@ -243,6 +294,48 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set({
         isLoading: false,
         error: `Failed to regenerate response: ${error}`,
+      });
+    }
+  },
+
+  compareResponse: async (
+    apiKey: string,
+    provider: Provider,
+    model: string,
+    context?: string,
+    sources?: SourceReference[]
+  ) => {
+    const { currentConversationId } = get();
+
+    if (!currentConversationId) {
+      set({ error: "No conversation selected" });
+      return;
+    }
+
+    set({ isLoading: true, error: null });
+
+    try {
+      const response = await invoke<CompareResponse>("compare_response", {
+        request: {
+          conversation_id: currentConversationId,
+          provider,
+          model,
+          api_key: apiKey,
+          context,
+          sources,
+        },
+      });
+
+      set((state) => ({
+        messages: [...state.messages, response.message],
+        isLoading: false,
+      }));
+
+      await get().loadConversations();
+    } catch (error) {
+      set({
+        isLoading: false,
+        error: `Failed to compare response: ${error}`,
       });
     }
   },

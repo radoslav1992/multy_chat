@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageSquare, Sparkles, AlertCircle, PanelLeft, PanelRight, Download } from "lucide-react";
+import {
+  MessageSquare,
+  Sparkles,
+  AlertCircle,
+  PanelLeft,
+  PanelRight,
+  Download,
+  GitCompare,
+} from "lucide-react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { ScrollArea } from "@/components/ui/ScrollArea";
 import { MessageBubble } from "./MessageBubble";
@@ -21,9 +29,11 @@ export function ChatWindow() {
     isLoading,
     error,
     selectedProvider,
+    selectedModel,
     selectedBucketIds,
     sendMessage,
     regenerateLastResponse,
+    compareResponse,
     exportConversation,
     conversations,
     createConversation,
@@ -49,22 +59,39 @@ export function ChatWindow() {
     }
   }, [messages]);
 
+  const trimSnippet = (content: string, maxLength = 400) => {
+    if (content.length <= maxLength) return content;
+    return `${content.slice(0, maxLength)}...`;
+  };
+
   const buildContext = async (query: string) => {
-    if (selectedBucketIds.length === 0) return undefined;
+    if (selectedBucketIds.length === 0) {
+      return { context: undefined, sources: undefined };
+    }
 
     try {
       const results = await searchMultipleBuckets(selectedBucketIds, query);
-      if (results.length === 0) return undefined;
+      if (results.length === 0) {
+        return { context: undefined, sources: undefined };
+      }
 
-      return results
+      const context = results
         .map(
           (r) =>
             `[Source: ${r.filename}, Relevance: ${(r.score * 100).toFixed(1)}%]\n${r.content}`
         )
         .join("\n\n---\n\n");
+
+      const sources = results.map((result) => ({
+        filename: result.filename,
+        score: result.score,
+        content: trimSnippet(result.content),
+      }));
+
+      return { context, sources };
     } catch (err) {
       console.error("[RAG] Search error:", err);
-      return undefined;
+      return { context: undefined, sources: undefined };
     }
   };
 
@@ -83,11 +110,11 @@ export function ChatWindow() {
       conversationId = await createConversation(input.slice(0, 50));
     }
 
-    const context = await buildContext(input);
+    const { context, sources } = await buildContext(input);
     const messageContent = input;
     setInput("");
 
-    await sendMessage(messageContent, apiKey, context);
+    await sendMessage(messageContent, apiKey, context, sources);
   };
 
   const handleRegenerate = async () => {
@@ -110,9 +137,32 @@ export function ChatWindow() {
       return;
     }
 
-    const context = await buildContext(lastUser.content);
+    const { context, sources } = await buildContext(lastUser.content);
 
-    await regenerateLastResponse(apiKey, provider, lastAssistant.model, context);
+    await regenerateLastResponse(apiKey, provider, lastAssistant.model, context, sources);
+  };
+
+  const handleCompare = async () => {
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+
+    if (!lastUser) {
+      toast({
+        title: "Cannot compare",
+        description: "No user message available for comparison.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const apiKey = getApiKey(selectedProvider);
+    if (!apiKey) {
+      setSettingsOpen(true);
+      return;
+    }
+
+    const { context, sources } = await buildContext(lastUser.content);
+
+    await compareResponse(apiKey, selectedProvider, selectedModel, context, sources);
   };
 
   const handleExport = async () => {
@@ -148,6 +198,7 @@ export function ChatWindow() {
   const hasApiKey = !!getApiKey(selectedProvider);
 
   const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
+  const lastUserId = [...messages].reverse().find((m) => m.role === "user")?.id;
 
   return (
     <div className="flex flex-col h-full">
@@ -169,6 +220,15 @@ export function ChatWindow() {
         <div className="flex items-center gap-2 flex-shrink-0">
           <KnowledgeSelector />
           <ModelSelector />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleCompare}
+            title="Compare with selected model"
+            disabled={!currentConversationId || !lastUserId || isLoading}
+          >
+            <GitCompare className="h-5 w-5" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"

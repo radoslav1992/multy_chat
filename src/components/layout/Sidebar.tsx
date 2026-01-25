@@ -9,6 +9,8 @@ import {
   Moon,
   Search,
   X,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -29,6 +31,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
     createConversation,
     selectConversation,
     deleteConversation,
+    setConversationPinned,
     searchConversations,
   } = useChatStore();
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -54,6 +57,20 @@ export function Sidebar({ isOpen }: SidebarProps) {
       setConversationToDelete(null);
       setDeleteDialogOpen(false);
     }
+  };
+
+  const handlePinToggle = async (
+    e: React.MouseEvent,
+    id: string,
+    pinned: boolean | undefined
+  ) => {
+    e.stopPropagation();
+    await setConversationPinned(id, !pinned);
+    setSearchResults((prev) =>
+      prev.map((result) =>
+        result.id === id ? { ...result, pinned: !pinned } : result
+      )
+    );
   };
 
   useEffect(() => {
@@ -169,9 +186,14 @@ export function Sidebar({ isOpen }: SidebarProps) {
                               "bg-accent text-accent-foreground"
                           )}
                         >
-                          <p className="text-sm font-medium truncate pr-8">
+                        <div className="flex items-center gap-2 pr-8">
+                          {!!conversation.pinned && (
+                            <Pin className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                          )}
+                          <p className="text-sm font-medium truncate">
                             {truncateText(conversation.title, 25)}
                           </p>
+                        </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {conversation.snippet
                               ? truncateText(conversation.snippet, 60)
@@ -201,6 +223,29 @@ export function Sidebar({ isOpen }: SidebarProps) {
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                onClick={(e) =>
+                                  handlePinToggle(
+                                    e,
+                                    conversation.id,
+                                    conversation.pinned
+                                  )
+                                }
+                                title={
+                                  conversation.pinned
+                                    ? "Unpin conversation"
+                                    : "Pin conversation"
+                                }
+                              >
+                                {conversation.pinned ? (
+                                  <PinOff className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Pin className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
                             </motion.div>
                           )}
                         </AnimatePresence>
@@ -226,9 +271,14 @@ export function Sidebar({ isOpen }: SidebarProps) {
                             "bg-accent text-accent-foreground"
                         )}
                       >
-                        <p className="text-sm font-medium truncate pr-8">
-                          {truncateText(conversation.title, 25)}
-                        </p>
+                        <div className="flex items-center gap-2 pr-8">
+                          {!!conversation.pinned && (
+                            <Pin className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                          )}
+                          <p className="text-sm font-medium truncate">
+                            {truncateText(conversation.title, 25)}
+                          </p>
+                        </div>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {formatDate(conversation.updated_at)}
                         </p>
@@ -255,6 +305,29 @@ export function Sidebar({ isOpen }: SidebarProps) {
                               }
                             >
                               <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-primary"
+                              onClick={(e) =>
+                                handlePinToggle(
+                                  e,
+                                  conversation.id,
+                                  conversation.pinned
+                                )
+                              }
+                              title={
+                                conversation.pinned
+                                  ? "Unpin conversation"
+                                  : "Pin conversation"
+                              }
+                            >
+                              {conversation.pinned ? (
+                                <PinOff className="h-3.5 w-3.5" />
+                              ) : (
+                                <Pin className="h-3.5 w-3.5" />
+                              )}
                             </Button>
                           </motion.div>
                         )}
