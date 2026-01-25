@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { User, Copy, Check } from "lucide-react";
+import { User, Copy, Check, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { Message } from "@/stores/chatStore";
 import { MarkdownRenderer } from "@/components/preview/MarkdownRenderer";
@@ -9,9 +9,15 @@ import { Button } from "@/components/ui/Button";
 interface MessageBubbleProps {
   message: Message;
   isLast?: boolean;
+  canRegenerate?: boolean;
+  onRegenerate?: () => void;
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  canRegenerate,
+  onRegenerate,
+}: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === "user";
 
@@ -26,7 +32,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className={cn("flex gap-4 py-4", isUser ? "flex-row-reverse" : "flex-row")}
+      className={cn(
+        "group flex gap-4 py-4",
+        isUser ? "flex-row-reverse" : "flex-row"
+      )}
     >
       {/* Avatar */}
       <div
@@ -82,6 +91,17 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         {/* Actions */}
         {!isUser && (
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {canRegenerate && onRegenerate && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={onRegenerate}
+                title="Regenerate response"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"

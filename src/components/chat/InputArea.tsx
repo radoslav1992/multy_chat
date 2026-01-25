@@ -1,10 +1,34 @@
 import { useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, BookOpen, X } from "lucide-react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { Send, BookOpen, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useChatStore } from "@/stores/chatStore";
 import { useKnowledgeStore } from "@/stores/knowledgeStore";
 import { cn } from "@/lib/utils";
+
+const PROMPT_TEMPLATES = [
+  {
+    id: "summarize",
+    label: "Summarize text",
+    template: "Summarize the following:\n\n",
+  },
+  {
+    id: "email",
+    label: "Draft an email",
+    template: "Draft a professional email about:\n\n",
+  },
+  {
+    id: "notes",
+    label: "Meeting notes",
+    template: "Turn these points into clear meeting notes:\n\n",
+  },
+  {
+    id: "plan",
+    label: "Create a plan",
+    template: "Create a step-by-step plan for:\n\n",
+  },
+];
 
 interface InputAreaProps {
   value: string;
@@ -49,6 +73,18 @@ export function InputArea({
 
   const removeBucket = (bucketId: string) => {
     setSelectedBucketIds(selectedBucketIds.filter((id) => id !== bucketId));
+  };
+
+  const insertTemplate = (template: string) => {
+    if (!value.trim()) return template;
+    const separator = value.endsWith("\n") ? "\n" : "\n\n";
+    return `${value}${separator}${template}`;
+  };
+
+  const handleTemplateSelect = (template: string) => {
+    const nextValue = insertTemplate(template);
+    onChange(nextValue);
+    requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
   return (
@@ -97,6 +133,41 @@ export function InputArea({
             "focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20"
           )}
         >
+          <div className="flex items-end p-2">
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-xl"
+                  title="Prompt templates"
+                >
+                  <Sparkles className="h-4 w-4" />
+                </Button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content
+                  className="min-w-[200px] rounded-lg border border-border bg-popover p-1 shadow-lg"
+                  sideOffset={6}
+                  align="start"
+                >
+                  {PROMPT_TEMPLATES.map((item) => (
+                    <DropdownMenu.Item
+                      key={item.id}
+                      className={cn(
+                        "cursor-pointer select-none rounded-md px-3 py-2 text-sm outline-none",
+                        "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+                      )}
+                      onSelect={() => handleTemplateSelect(item.template)}
+                    >
+                      {item.label}
+                    </DropdownMenu.Item>
+                  ))}
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+          </div>
+
           <textarea
             ref={textareaRef}
             value={value}

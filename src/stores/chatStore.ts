@@ -18,6 +18,19 @@ export interface Conversation {
   updated_at: string;
 }
 
+export interface ConversationSearchResult {
+  id: string;
+  title: string;
+  updated_at: string;
+  snippet: string;
+}
+
+interface RegenerateResponse {
+  message: Message;
+  conversation_id: string;
+  replaced_message_id: string;
+}
+
 export type Provider = "anthropic" | "openai" | "gemini" | "deepseek";
 
 interface ChatState {
@@ -38,6 +51,14 @@ interface ChatState {
   deleteConversation: (id: string) => Promise<void>;
   selectConversation: (id: string) => Promise<void>;
   sendMessage: (content: string, apiKey: string, context?: string) => Promise<void>;
+  regenerateLastResponse: (
+    apiKey: string,
+    provider: Provider,
+    model: string,
+    context?: string
+  ) => Promise<void>;
+  searchConversations: (query: string) => Promise<ConversationSearchResult[]>;
+  exportConversation: (conversationId: string, filePath: string) => Promise<void>;
   setSelectedProvider: (provider: Provider) => void;
   setSelectedModel: (model: string) => void;
   setSelectedBucketIds: (ids: string[]) => void;
@@ -177,6 +198,74 @@ export const useChatStore = create<ChatState>((set, get) => ({
         isLoading: false,
         error: `Failed to send message: ${error}`,
       }));
+    }
+  },
+
+  regenerateLastResponse: async (
+    apiKey: string,
+    provider: Provider,
+    model: string,
+    context?: string
+  ) => {
+    const { currentConversationId } = get();
+
+    if (!currentConversationId) {
+      set({ error: "No conversation selected" });
+      return;
+    }
+
+    set({ isLoading: true, error: null });
+
+    try {
+      const response = await invoke<RegenerateResponse>(
+        "regenerate_last_assistant",
+        {
+          request: {
+            conversation_id: currentConversationId,
+            provider,
+            model,
+            api_key: apiKey,
+            context,
+          },
+        }
+      );
+
+      set((state) => ({
+        messages: [
+          ...state.messages.filter((m) => m.id !== response.replaced_message_id),
+          response.message,
+        ],
+        isLoading: false,
+      }));
+
+      await get().loadConversations();
+    } catch (error) {
+      set({
+        isLoading: false,
+        error: `Failed to regenerate response: ${error}`,
+      });
+    }
+  },
+
+  searchConversations: async (query: string) => {
+    try {
+      const results = await invoke<ConversationSearchResult[]>(
+        "search_conversations",
+        { query }
+      );
+      return results;
+    } catch (error) {
+      set({ error: `Failed to search conversations: ${error}` });
+      return [];
+    }
+  },
+
+  exportConversation: async (conversationId: string, filePath: string) => {
+    try {
+      await invoke("export_conversation_markdown", { conversationId, filePath });
+    } catch (error) {
+      set({ error: `Failed to export conversation: ${error}` });
+      throw error;
     }
   },
 

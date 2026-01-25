@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageSquare, Sparkles, AlertCircle, PanelLeft, PanelRight } from "lucide-react";
+import { MessageSquare, Sparkles, AlertCircle, PanelLeft, PanelRight, Download } from "lucide-react";
+import { save } from "@tauri-apps/plugin-dialog";
 import { ScrollArea } from "@/components/ui/ScrollArea";
 import { MessageBubble } from "./MessageBubble";
 import { InputArea } from "./InputArea";
 import { ModelSelector } from "./ModelSelector";
 import { KnowledgeSelector } from "./KnowledgeSelector";
 import { Button } from "@/components/ui/Button";
-import { useChatStore } from "@/stores/chatStore";
+import { useToast } from "@/components/ui/Toaster";
+import { useChatStore, Provider } from "@/stores/chatStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useKnowledgeStore } from "@/stores/knowledgeStore";
 import { useAppStore } from "@/stores/appStore";
@@ -21,6 +23,9 @@ export function ChatWindow() {
     selectedProvider,
     selectedBucketIds,
     sendMessage,
+    regenerateLastResponse,
+    exportConversation,
+    conversations,
     createConversation,
     clearError,
   } = useChatStore();
@@ -28,6 +33,7 @@ export function ChatWindow() {
   const { getApiKey, loadAllApiKeys } = useSettingsStore();
   const { searchMultipleBuckets } = useKnowledgeStore();
   const { setSettingsOpen, sidebarOpen, toggleSidebar, knowledgeSidebarOpen, toggleKnowledgeSidebar } = useAppStore();
+  const { toast } = useToast();
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
@@ -42,6 +48,25 @@ export function ChatWindow() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  const buildContext = async (query: string) => {
+    if (selectedBucketIds.length === 0) return undefined;
+
+    try {
+      const results = await searchMultipleBuckets(selectedBucketIds, query);
+      if (results.length === 0) return undefined;
+
+      return results
+        .map(
+          (r) =>
+            `[Source: ${r.filename}, Relevance: ${(r.score * 100).toFixed(1)}%]\n${r.content}`
+        )
+        .join("\n\n---\n\n");
+    } catch (err) {
+      console.error("[RAG] Search error:", err);
+      return undefined;
+    }
+  };
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -58,42 +83,71 @@ export function ChatWindow() {
       conversationId = await createConversation(input.slice(0, 50));
     }
 
-    // Search knowledge buckets if any are selected (uses local embeddings)
-    let context: string | undefined;
-    console.log("[RAG] Selected bucket IDs:", selectedBucketIds);
-    if (selectedBucketIds.length > 0) {
-      console.log("[RAG] Searching buckets:", selectedBucketIds);
-      try {
-        const results = await searchMultipleBuckets(selectedBucketIds, input);
-        console.log("[RAG] Search results:", results);
-        if (results.length > 0) {
-          context = results
-            .map((r) => `[Source: ${r.filename}, Relevance: ${(r.score * 100).toFixed(1)}%]\n${r.content}`)
-            .join("\n\n---\n\n");
-          console.log("[RAG] Context length:", context.length, "chars");
-          console.log("[RAG] Context preview:", context.substring(0, 500));
-        } else {
-          console.log("[RAG] No relevant results found in knowledge buckets");
-        }
-      } catch (err) {
-        console.error("[RAG] Search error:", err);
-      }
-    } else {
-      console.log("[RAG] No buckets selected");
-    }
-
+    const context = await buildContext(input);
     const messageContent = input;
     setInput("");
-    
-    // Log when sending with context
-    if (context) {
-      console.log("[Chat] Sending message with RAG context");
-    }
-    
+
     await sendMessage(messageContent, apiKey, context);
   };
 
+  const handleRegenerate = async () => {
+    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+
+    if (!lastAssistant || !lastUser) {
+      toast({
+        title: "Cannot regenerate",
+        description: "No assistant response to regenerate yet.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const provider = lastAssistant.provider as Provider;
+    const apiKey = getApiKey(provider);
+    if (!apiKey) {
+      setSettingsOpen(true);
+      return;
+    }
+
+    const context = await buildContext(lastUser.content);
+
+    await regenerateLastResponse(apiKey, provider, lastAssistant.model, context);
+  };
+
+  const handleExport = async () => {
+    if (!currentConversationId) return;
+
+    const conversation = conversations.find((c) => c.id === currentConversationId);
+    const title = conversation?.title || "conversation";
+    const safeTitle = title.replace(/[^a-zA-Z0-9-_ ]/g, "").trim() || "conversation";
+    const defaultPath = `${safeTitle.replace(/\s+/g, "-").toLowerCase()}.md`;
+
+    const filePath = await save({
+      defaultPath,
+      filters: [{ name: "Markdown", extensions: ["md"] }],
+    });
+
+    if (!filePath) return;
+
+    try {
+      await exportConversation(currentConversationId, filePath);
+      toast({
+        title: "Export complete",
+        description: "Conversation saved as Markdown.",
+      });
+    } catch (err) {
+      toast({
+        title: "Export failed",
+        description: String(err),
+        variant: "destructive",
+      });
+    }
+  };
+
   const hasApiKey = !!getApiKey(selectedProvider);
+
+  const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
 
   return (
     <div className="flex flex-col h-full">
@@ -115,6 +169,15 @@ export function ChatWindow() {
         <div className="flex items-center gap-2 flex-shrink-0">
           <KnowledgeSelector />
           <ModelSelector />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleExport}
+            title="Export conversation"
+            disabled={!currentConversationId}
+          >
+            <Download className="h-5 w-5" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -166,6 +229,8 @@ export function ChatWindow() {
                   key={message.id}
                   message={message}
                   isLast={index === messages.length - 1}
+                  canRegenerate={message.id === lastAssistantId && !isLoading}
+                  onRegenerate={message.id === lastAssistantId ? handleRegenerate : undefined}
                 />
               ))
             )}

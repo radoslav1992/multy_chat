@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import {
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { ScrollArea } from "@/components/ui/ScrollArea";
 import { useAppStore } from "@/stores/appStore";
-import { useChatStore } from "@/stores/chatStore";
+import { useChatStore, ConversationSearchResult } from "@/stores/chatStore";
 import { cn, formatDate, truncateText } from "@/lib/utils";
 
 interface SidebarProps {
@@ -29,9 +29,12 @@ export function Sidebar({ isOpen }: SidebarProps) {
     createConversation,
     selectConversation,
     deleteConversation,
+    searchConversations,
   } = useChatStore();
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<ConversationSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [conversationToDelete, setConversationToDelete] = useState<{id: string, title: string} | null>(null);
 
@@ -53,14 +56,41 @@ export function Sidebar({ isOpen }: SidebarProps) {
     }
   };
 
-  // Filter conversations based on search query
-  const filteredConversations = useMemo(() => {
-    if (!searchQuery.trim()) return conversations;
-    const query = searchQuery.toLowerCase();
-    return conversations.filter((conv) =>
-      conv.title.toLowerCase().includes(query)
-    );
-  }, [conversations, searchQuery]);
+  useEffect(() => {
+    const trimmedQuery = searchQuery.trim();
+    if (!trimmedQuery) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    let isActive = true;
+    setIsSearching(true);
+
+    const timeout = setTimeout(() => {
+      searchConversations(trimmedQuery)
+        .then((results) => {
+          if (isActive) {
+            setSearchResults(results);
+          }
+        })
+        .catch(() => {
+          if (isActive) {
+            setSearchResults([]);
+          }
+        })
+        .finally(() => {
+          if (isActive) {
+            setIsSearching(false);
+          }
+        });
+    }, 250);
+
+    return () => {
+      isActive = false;
+      clearTimeout(timeout);
+    };
+  }, [searchQuery, searchConversations, conversations]);
 
   return (
     <>
@@ -111,12 +141,74 @@ export function Sidebar({ isOpen }: SidebarProps) {
                   <p className="text-sm text-muted-foreground text-center py-8">
                     No conversations yet
                   </p>
-                ) : filteredConversations.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    No matches found
-                  </p>
+                ) : searchQuery.trim() ? (
+                  isSearching ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      Searching...
+                    </p>
+                  ) : searchResults.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      No matches found
+                    </p>
+                  ) : (
+                    searchResults.map((conversation) => (
+                      <motion.div
+                        key={conversation.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="relative"
+                        onMouseEnter={() => setHoveredId(conversation.id)}
+                        onMouseLeave={() => setHoveredId(null)}
+                      >
+                        <button
+                          onClick={() => selectConversation(conversation.id)}
+                          className={cn(
+                            "w-full text-left px-3 py-2 rounded-lg transition-colors duration-150",
+                            "hover:bg-accent/50",
+                            currentConversationId === conversation.id &&
+                              "bg-accent text-accent-foreground"
+                          )}
+                        >
+                          <p className="text-sm font-medium truncate pr-8">
+                            {truncateText(conversation.title, 25)}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {conversation.snippet
+                              ? truncateText(conversation.snippet, 60)
+                              : formatDate(conversation.updated_at)}
+                          </p>
+                        </button>
+
+                        <AnimatePresence>
+                          {hoveredId === conversation.id && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.8 }}
+                              className="absolute right-2 top-1/2 -translate-y-1/2"
+                            >
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                onClick={(e) =>
+                                  handleDeleteClick(
+                                    e,
+                                    conversation.id,
+                                    conversation.title
+                                  )
+                                }
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+                    ))
+                  )
                 ) : (
-                  filteredConversations.map((conversation) => (
+                  conversations.map((conversation) => (
                     <motion.div
                       key={conversation.id}
                       initial={{ opacity: 0, x: -20 }}
@@ -154,7 +246,13 @@ export function Sidebar({ isOpen }: SidebarProps) {
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                              onClick={(e) => handleDeleteClick(e, conversation.id, conversation.title)}
+                              onClick={(e) =>
+                                handleDeleteClick(
+                                  e,
+                                  conversation.id,
+                                  conversation.title
+                                )
+                              }
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>

@@ -5,7 +5,7 @@ use tauri::Manager;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::commands::chat::{Conversation, Message};
+use crate::commands::chat::{Conversation, Message, SearchConversationResult};
 use crate::commands::knowledge::{Bucket, BucketFile};
 
 #[derive(Serialize, Deserialize, Default)]
@@ -88,6 +88,12 @@ pub async fn save_message(app: &AppHandle, message: &Message) -> Result<()> {
     save_db(app, &db)
 }
 
+pub async fn delete_message(app: &AppHandle, message_id: &str) -> Result<()> {
+    let mut db = load_db(app);
+    db.messages.retain(|m| m.id != message_id);
+    save_db(app, &db)
+}
+
 pub async fn get_messages(app: &AppHandle, conversation_id: &str) -> Result<Vec<Message>> {
     let db = load_db(app);
     let mut messages: Vec<Message> = db.messages
@@ -96,6 +102,55 @@ pub async fn get_messages(app: &AppHandle, conversation_id: &str) -> Result<Vec<
         .collect();
     messages.sort_by(|a, b| a.created_at.cmp(&b.created_at));
     Ok(messages)
+}
+
+fn build_snippet(content: &str, match_index: usize, match_len: usize) -> String {
+    let preview_radius = 40usize;
+    let start = match_index.saturating_sub(preview_radius);
+    let end = (match_index + match_len + preview_radius).min(content.len());
+    let snippet = content.get(start..end).unwrap_or(content).trim();
+    let prefix = if start > 0 { "..." } else { "" };
+    let suffix = if end < content.len() { "..." } else { "" };
+    format!("{}{}{}", prefix, snippet, suffix)
+}
+
+pub async fn search_conversations(
+    app: &AppHandle,
+    query: &str,
+) -> Result<Vec<SearchConversationResult>> {
+    let db = load_db(app);
+    let needle = query.to_lowercase();
+    let mut results: Vec<SearchConversationResult> = Vec::new();
+
+    for conv in db.conversations.iter() {
+        let title_lower = conv.title.to_lowercase();
+        if title_lower.contains(&needle) {
+            results.push(SearchConversationResult {
+                id: conv.id.clone(),
+                title: conv.title.clone(),
+                updated_at: conv.updated_at.clone(),
+                snippet: "Title match".to_string(),
+            });
+            continue;
+        }
+
+        for msg in db.messages.iter().filter(|m| m.conversation_id == conv.id) {
+            let content_lower = msg.content.to_lowercase();
+            if let Some(index) = content_lower.find(&needle) {
+                let snippet = build_snippet(&msg.content, index, needle.len());
+                results.push(SearchConversationResult {
+                    id: conv.id.clone(),
+                    title: conv.title.clone(),
+                    updated_at: conv.updated_at.clone(),
+                    snippet,
+                });
+                break;
+            }
+        }
+    }
+
+    results.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    Ok(results)
 }
 
 // Bucket operations
