@@ -18,6 +18,7 @@ export interface Conversation {
   created_at: string;
   updated_at: string;
   pinned?: boolean;
+  tags?: string[];
 }
 
 export interface ConversationSearchResult {
@@ -26,6 +27,7 @@ export interface ConversationSearchResult {
   updated_at: string;
   snippet: string;
   pinned: boolean;
+  tags: string[];
 }
 
 export interface SourceReference {
@@ -64,6 +66,9 @@ interface ChatState {
   createConversation: (title?: string) => Promise<string>;
   deleteConversation: (id: string) => Promise<void>;
   setConversationPinned: (id: string, pinned: boolean) => Promise<void>;
+  updateConversationTags: (id: string, tags: string[]) => Promise<void>;
+  cloneConversation: (id: string, title: string) => Promise<string>;
+  updateMessageContent: (messageId: string, content: string) => Promise<void>;
   selectConversation: (id: string) => Promise<void>;
   sendMessage: (
     content: string,
@@ -176,6 +181,56 @@ export const useChatStore = create<ChatState>((set, get) => ({
       await get().loadConversations();
     } catch (error) {
       set({ error: `Failed to update conversation pin: ${error}` });
+    }
+  },
+
+  updateConversationTags: async (id: string, tags: string[]) => {
+    set((state) => ({
+      conversations: state.conversations.map((conversation) =>
+        conversation.id === id ? { ...conversation, tags } : conversation
+      ),
+    }));
+
+    try {
+      await invoke("update_conversation_tags", { conversationId: id, tags });
+    } catch (error) {
+      set({ error: `Failed to update conversation tags: ${error}` });
+    }
+  },
+
+  cloneConversation: async (id: string, title: string) => {
+    try {
+      const conversation = await invoke<Conversation>("clone_conversation", {
+        conversationId: id,
+        title,
+      });
+
+      set((state) => ({
+        conversations: [conversation, ...state.conversations],
+        currentConversationId: conversation.id,
+        messages: [],
+      }));
+
+      await get().loadMessages(conversation.id);
+      await get().loadConversations();
+      return conversation.id;
+    } catch (error) {
+      set({ error: `Failed to clone conversation: ${error}` });
+      throw error;
+    }
+  },
+
+  updateMessageContent: async (messageId: string, content: string) => {
+    try {
+      await invoke("update_message_content", { messageId, content });
+      set((state) => ({
+        messages: state.messages.map((message) =>
+          message.id === messageId ? { ...message, content } : message
+        ),
+      }));
+    } catch (error) {
+      set({ error: `Failed to update message: ${error}` });
+      throw error;
     }
   },
 

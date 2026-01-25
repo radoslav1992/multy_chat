@@ -4,6 +4,8 @@ use tauri::AppHandle;
 use tauri::Manager;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+use chrono::Utc;
 
 use crate::commands::chat::{Conversation, Message, SearchConversationResult};
 use crate::commands::knowledge::{Bucket, BucketFile};
@@ -78,6 +80,18 @@ pub async fn update_conversation_title(app: &AppHandle, id: &str, title: &str) -
     save_db(app, &db)
 }
 
+pub async fn update_conversation_tags(
+    app: &AppHandle,
+    id: &str,
+    tags: &[String],
+) -> Result<()> {
+    let mut db = load_db(app);
+    if let Some(conv) = db.conversations.iter_mut().find(|c| c.id == id) {
+        conv.tags = tags.to_vec();
+    }
+    save_db(app, &db)
+}
+
 pub async fn update_conversation_pinned(
     app: &AppHandle,
     id: &str,
@@ -102,6 +116,18 @@ pub async fn update_conversation_timestamp(app: &AppHandle, id: &str) -> Result<
 pub async fn save_message(app: &AppHandle, message: &Message) -> Result<()> {
     let mut db = load_db(app);
     db.messages.push(message.clone());
+    save_db(app, &db)
+}
+
+pub async fn update_message_content(
+    app: &AppHandle,
+    message_id: &str,
+    content: &str,
+) -> Result<()> {
+    let mut db = load_db(app);
+    if let Some(message) = db.messages.iter_mut().find(|m| m.id == message_id) {
+        message.content = content.to_string();
+    }
     save_db(app, &db)
 }
 
@@ -148,6 +174,23 @@ pub async fn search_conversations(
                 updated_at: conv.updated_at.clone(),
                 snippet: "Title match".to_string(),
                 pinned: conv.pinned,
+                tags: conv.tags.clone(),
+            });
+            continue;
+        }
+
+        if let Some(tag) = conv
+            .tags
+            .iter()
+            .find(|tag| tag.to_lowercase().contains(&needle))
+        {
+            results.push(SearchConversationResult {
+                id: conv.id.clone(),
+                title: conv.title.clone(),
+                updated_at: conv.updated_at.clone(),
+                snippet: format!("Tag: {}", tag),
+                pinned: conv.pinned,
+                tags: conv.tags.clone(),
             });
             continue;
         }
@@ -162,6 +205,7 @@ pub async fn search_conversations(
                     updated_at: conv.updated_at.clone(),
                     snippet,
                     pinned: conv.pinned,
+                    tags: conv.tags.clone(),
                 });
                 break;
             }
@@ -175,6 +219,44 @@ pub async fn search_conversations(
         b.updated_at.cmp(&a.updated_at)
     });
     Ok(results)
+}
+
+pub async fn clone_conversation(
+    app: &AppHandle,
+    source_id: &str,
+    title: &str,
+) -> Result<Conversation> {
+    let mut db = load_db(app);
+    let source = db
+        .conversations
+        .iter()
+        .find(|c| c.id == source_id)
+        .cloned()
+        .ok_or_else(|| anyhow::anyhow!("Conversation not found"))?;
+
+    let new_id = Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+
+    let conversation = Conversation {
+        id: new_id.clone(),
+        title: title.to_string(),
+        created_at: now.clone(),
+        updated_at: now,
+        pinned: false,
+        tags: source.tags.clone(),
+    };
+
+    db.conversations.insert(0, conversation.clone());
+
+    for message in db.messages.iter().filter(|m| m.conversation_id == source_id) {
+        let mut cloned = message.clone();
+        cloned.id = Uuid::new_v4().to_string();
+        cloned.conversation_id = new_id.clone();
+        db.messages.push(cloned);
+    }
+
+    save_db(app, &db)?;
+    Ok(conversation)
 }
 
 // Bucket operations

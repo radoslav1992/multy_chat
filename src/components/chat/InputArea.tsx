@@ -36,6 +36,8 @@ interface InputAreaProps {
   onSend: () => void;
   disabled?: boolean;
   placeholder?: string;
+  isEditing?: boolean;
+  onCancelEdit?: () => void;
 }
 
 export function InputArea({
@@ -44,6 +46,8 @@ export function InputArea({
   onSend,
   disabled,
   placeholder,
+  isEditing,
+  onCancelEdit,
 }: InputAreaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { selectedBucketIds, setSelectedBucketIds } = useChatStore();
@@ -90,6 +94,18 @@ export function InputArea({
   return (
     <div className="border-t border-border bg-card/50 backdrop-blur-sm p-4">
       <div className="max-w-4xl mx-auto">
+        {isEditing && (
+          <div className="flex items-center justify-between mb-2 px-3 py-2 rounded-lg border border-border bg-muted/40">
+            <span className="text-xs text-muted-foreground">
+              Editing last message
+            </span>
+            {onCancelEdit && (
+              <Button variant="ghost" size="sm" onClick={onCancelEdit}>
+                Cancel
+              </Button>
+            )}
+          </div>
+        )}
         {/* Selected Knowledge Buckets */}
         <AnimatePresence>
           {selectedBuckets.length > 0 && (

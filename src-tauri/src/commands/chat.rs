@@ -14,6 +14,8 @@ pub struct Conversation {
     pub updated_at: String,
     #[serde(default)]
     pub pinned: bool,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -60,6 +62,7 @@ pub struct SearchConversationResult {
     pub updated_at: String,
     pub snippet: String,
     pub pinned: bool,
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -368,6 +371,7 @@ pub async fn create_conversation(app: AppHandle, title: String) -> Result<Conver
         created_at: now.clone(),
         updated_at: now,
         pinned: false,
+        tags: Vec::new(),
     };
     
     db::create_conversation(&app, &conversation).await
@@ -403,6 +407,36 @@ pub async fn update_conversation_pinned(
 }
 
 #[tauri::command]
+pub async fn update_conversation_tags(
+    app: AppHandle,
+    conversation_id: String,
+    tags: Vec<String>,
+) -> Result<(), String> {
+    db::update_conversation_tags(&app, &conversation_id, &tags).await
+        .map_err(|e| format!("Failed to update conversation tags: {}", e))
+}
+
+#[tauri::command]
+pub async fn update_message_content(
+    app: AppHandle,
+    message_id: String,
+    content: String,
+) -> Result<(), String> {
+    db::update_message_content(&app, &message_id, &content).await
+        .map_err(|e| format!("Failed to update message: {}", e))
+}
+
+#[tauri::command]
+pub async fn clone_conversation(
+    app: AppHandle,
+    conversation_id: String,
+    title: String,
+) -> Result<Conversation, String> {
+    db::clone_conversation(&app, &conversation_id, &title).await
+        .map_err(|e| format!("Failed to clone conversation: {}", e))
+}
+
+#[tauri::command]
 pub async fn export_conversation_markdown(
     app: AppHandle,
     conversation_id: String,
@@ -423,6 +457,11 @@ pub async fn export_conversation_markdown(
     output.push_str("# ");
     output.push_str(&conversation.title);
     output.push_str("\n\n");
+    if !conversation.tags.is_empty() {
+        output.push_str("**Tags:** ");
+        output.push_str(&conversation.tags.join(", "));
+        output.push_str("\n\n");
+    }
     output.push_str("*Exported from Multi-Model Chat*\n\n");
 
     for message in messages {

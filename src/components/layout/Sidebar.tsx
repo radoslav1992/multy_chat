@@ -59,6 +59,29 @@ export function Sidebar({ isOpen }: SidebarProps) {
     }
   };
 
+  const renderTags = (tags?: string[]) => {
+    if (!tags || tags.length === 0) return null;
+    const visibleTags = tags.slice(0, 3);
+    const remaining = tags.length - visibleTags.length;
+    return (
+      <div className="flex flex-wrap gap-1 mt-1">
+        {visibleTags.map((tag) => (
+          <span
+            key={tag}
+            className="px-1.5 py-0.5 rounded-sm text-[10px] bg-muted/60 text-muted-foreground"
+          >
+            {tag}
+          </span>
+        ))}
+        {remaining > 0 && (
+          <span className="px-1.5 py-0.5 rounded-sm text-[10px] bg-muted/60 text-muted-foreground">
+            +{remaining}
+          </span>
+        )}
+      </div>
+    );
+  };
+
   const handlePinToggle = async (
     e: React.MouseEvent,
     id: string,
@@ -199,6 +222,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
                               ? truncateText(conversation.snippet, 60)
                               : formatDate(conversation.updated_at)}
                           </p>
+                        {renderTags(conversation.tags)}
                         </button>
 
                         <AnimatePresence>
@@ -282,6 +306,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {formatDate(conversation.updated_at)}
                         </p>
+                        {renderTags(conversation.tags)}
                       </button>
 
                       <AnimatePresence>

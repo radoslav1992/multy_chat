@@ -8,7 +8,12 @@ import {
   PanelRight,
   Download,
   GitCompare,
+  Tag,
+  GitBranch,
+  Plus,
+  X,
 } from "lucide-react";
+import * as Popover from "@radix-ui/react-popover";
 import { save } from "@tauri-apps/plugin-dialog";
 import { ScrollArea } from "@/components/ui/ScrollArea";
 import { MessageBubble } from "./MessageBubble";
@@ -16,8 +21,9 @@ import { InputArea } from "./InputArea";
 import { ModelSelector } from "./ModelSelector";
 import { KnowledgeSelector } from "./KnowledgeSelector";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toaster";
-import { useChatStore, Provider } from "@/stores/chatStore";
+import { Message, useChatStore, Provider } from "@/stores/chatStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useKnowledgeStore } from "@/stores/knowledgeStore";
 import { useAppStore } from "@/stores/appStore";
@@ -34,6 +40,9 @@ export function ChatWindow() {
     sendMessage,
     regenerateLastResponse,
     compareResponse,
+    updateMessageContent,
+    updateConversationTags,
+    cloneConversation,
     exportConversation,
     conversations,
     createConversation,
@@ -47,6 +56,14 @@ export function ChatWindow() {
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [tagInput, setTagInput] = useState("");
+  const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
+
+  const currentConversation = conversations.find(
+    (conversation) => conversation.id === currentConversationId
+  );
+  const currentTags = currentConversation?.tags ?? [];
 
   useEffect(() => {
     loadAllApiKeys();
@@ -58,6 +75,16 @@ export function ChatWindow() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  useEffect(() => {
+    setEditingMessageId(null);
+  }, [currentConversationId]);
+
+  useEffect(() => {
+    if (!tagPopoverOpen) {
+      setTagInput("");
+    }
+  }, [tagPopoverOpen]);
 
   const trimSnippet = (content: string, maxLength = 400) => {
     if (content.length <= maxLength) return content;
@@ -96,7 +123,35 @@ export function ChatWindow() {
   };
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    const trimmed = input.trim();
+    if (!trimmed) return;
+
+    if (editingMessageId) {
+      const lastAssistant = [...messages]
+        .reverse()
+        .find((message) => message.role === "assistant");
+      const provider = (lastAssistant?.provider as Provider) || selectedProvider;
+      const model = lastAssistant?.model || selectedModel;
+      const apiKey = getApiKey(provider);
+
+      if (!apiKey) {
+        setSettingsOpen(true);
+        return;
+      }
+
+      const { context, sources } = await buildContext(trimmed);
+
+      await updateMessageContent(editingMessageId, trimmed);
+      setEditingMessageId(null);
+      setInput("");
+
+      if (lastAssistant) {
+        await regenerateLastResponse(apiKey, provider, model, context, sources);
+      } else {
+        await compareResponse(apiKey, provider, model, context, sources);
+      }
+      return;
+    }
 
     const apiKey = getApiKey(selectedProvider);
     if (!apiKey) {
@@ -107,11 +162,11 @@ export function ChatWindow() {
     // Create conversation if none exists
     let conversationId = currentConversationId;
     if (!conversationId) {
-      conversationId = await createConversation(input.slice(0, 50));
+      conversationId = await createConversation(trimmed.slice(0, 50));
     }
 
-    const { context, sources } = await buildContext(input);
-    const messageContent = input;
+    const { context, sources } = await buildContext(trimmed);
+    const messageContent = trimmed;
     setInput("");
 
     await sendMessage(messageContent, apiKey, context, sources);
@@ -163,6 +218,59 @@ export function ChatWindow() {
     const { context, sources } = await buildContext(lastUser.content);
 
     await compareResponse(apiKey, selectedProvider, selectedModel, context, sources);
+  };
+
+  const handleFork = async () => {
+    if (!currentConversationId) return;
+    const title = currentConversation?.title || "Conversation";
+    const forkTitle = `Copy of ${title}`;
+
+    try {
+      await cloneConversation(currentConversationId, forkTitle);
+      toast({
+        title: "Conversation forked",
+        description: "You can continue in the new copy.",
+      });
+    } catch (err) {
+      toast({
+        title: "Fork failed",
+        description: String(err),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEditMessage = (message: Message) => {
+    setEditingMessageId(message.id);
+    setInput(message.content);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setInput("");
+  };
+
+  const handleAddTag = async () => {
+    if (!currentConversationId) return;
+    const trimmed = tagInput.trim();
+    if (!trimmed) return;
+
+    const normalized = trimmed.toLowerCase();
+    const existing = new Set(currentTags.map((tag) => tag.toLowerCase()));
+    if (existing.has(normalized)) {
+      setTagInput("");
+      return;
+    }
+
+    const nextTags = [...currentTags, trimmed];
+    await updateConversationTags(currentConversationId, nextTags);
+    setTagInput("");
+  };
+
+  const handleRemoveTag = async (tag: string) => {
+    if (!currentConversationId) return;
+    const nextTags = currentTags.filter((existing) => existing !== tag);
+    await updateConversationTags(currentConversationId, nextTags);
   };
 
   const handleExport = async () => {
@@ -220,6 +328,84 @@ export function ChatWindow() {
         <div className="flex items-center gap-2 flex-shrink-0">
           <KnowledgeSelector />
           <ModelSelector />
+          <Popover.Root open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
+            <Popover.Trigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Manage tags"
+                disabled={!currentConversationId}
+              >
+                <Tag className="h-5 w-5" />
+              </Button>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content
+                className="w-72 rounded-xl border border-border bg-popover p-3 shadow-lg"
+                sideOffset={8}
+                align="end"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">Tags</span>
+                  <button
+                    onClick={() => setTagPopoverOpen(false)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                {currentTags.length === 0 ? (
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Add tags to organize conversations.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {currentTags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs"
+                      >
+                        {tag}
+                        <button
+                          onClick={() => handleRemoveTag(tag)}
+                          className="hover:bg-primary/20 rounded-full p-0.5"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAddTag()}
+                    placeholder="Add tag"
+                    className="h-8"
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={handleAddTag}
+                    disabled={!tagInput.trim()}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleFork}
+            title="Fork conversation"
+            disabled={!currentConversationId}
+          >
+            <GitBranch className="h-5 w-5" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -291,6 +477,12 @@ export function ChatWindow() {
                   isLast={index === messages.length - 1}
                   canRegenerate={message.id === lastAssistantId && !isLoading}
                   onRegenerate={message.id === lastAssistantId ? handleRegenerate : undefined}
+                  canEdit={message.role === "user" && message.id === lastUserId && !isLoading}
+                  onEdit={
+                    message.role === "user" && message.id === lastUserId
+                      ? () => handleEditMessage(message)
+                      : undefined
+                  }
                 />
               ))
             )}
@@ -355,9 +547,13 @@ export function ChatWindow() {
         onChange={setInput}
         onSend={handleSend}
         disabled={isLoading || !hasApiKey}
+        isEditing={!!editingMessageId}
+        onCancelEdit={editingMessageId ? handleCancelEdit : undefined}
         placeholder={
           hasApiKey
-            ? "Type your message..."
+            ? editingMessageId
+              ? "Edit your message..."
+              : "Type your message..."
             : `Add your ${selectedProvider} API key in settings to start`
         }
       />

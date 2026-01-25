@@ -1,5 +1,13 @@
 import { motion } from "framer-motion";
-import { User, Copy, Check, RotateCcw, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  User,
+  Copy,
+  Check,
+  RotateCcw,
+  ChevronDown,
+  ChevronRight,
+  Pencil,
+} from "lucide-react";
 import { useState } from "react";
 import { Message } from "@/stores/chatStore";
 import { MarkdownRenderer } from "@/components/preview/MarkdownRenderer";
@@ -11,12 +19,16 @@ interface MessageBubbleProps {
   isLast?: boolean;
   canRegenerate?: boolean;
   onRegenerate?: () => void;
+  canEdit?: boolean;
+  onEdit?: () => void;
 }
 
 export function MessageBubble({
   message,
   canRegenerate,
   onRegenerate,
+  canEdit,
+  onEdit,
 }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const [showSources, setShowSources] = useState(false);
@@ -127,7 +139,33 @@ export function MessageBubble({
         )}
 
         {/* Actions */}
-        {!isUser && (
+        {isUser ? (
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {canEdit && onEdit && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={onEdit}
+                title="Edit message"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={handleCopy}
+            >
+              {copied ? (
+                <Check className="h-3.5 w-3.5 text-green-500" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </div>
+        ) : (
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             {canRegenerate && onRegenerate && (
               <Button
