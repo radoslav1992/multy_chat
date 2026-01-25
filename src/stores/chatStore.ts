@@ -19,6 +19,7 @@ export interface Conversation {
   updated_at: string;
   pinned?: boolean;
   tags?: string[];
+  folder?: string | null;
 }
 
 export interface ConversationSearchResult {
@@ -28,6 +29,7 @@ export interface ConversationSearchResult {
   snippet: string;
   pinned: boolean;
   tags: string[];
+  folder?: string | null;
 }
 
 export interface SourceReference {
@@ -67,6 +69,7 @@ interface ChatState {
   deleteConversation: (id: string) => Promise<void>;
   setConversationPinned: (id: string, pinned: boolean) => Promise<void>;
   updateConversationTags: (id: string, tags: string[]) => Promise<void>;
+  updateConversationFolder: (id: string, folder?: string | null) => Promise<void>;
   cloneConversation: (id: string, title: string) => Promise<string>;
   updateMessageContent: (messageId: string, content: string) => Promise<void>;
   selectConversation: (id: string) => Promise<void>;
@@ -195,6 +198,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
       await invoke("update_conversation_tags", { conversationId: id, tags });
     } catch (error) {
       set({ error: `Failed to update conversation tags: ${error}` });
+    }
+  },
+
+  updateConversationFolder: async (id: string, folder?: string | null) => {
+    const normalized = folder?.trim() ? folder : null;
+    set((state) => ({
+      conversations: state.conversations.map((conversation) =>
+        conversation.id === id ? { ...conversation, folder: normalized } : conversation
+      ),
+    }));
+
+    try {
+      await invoke("update_conversation_folder", {
+        conversationId: id,
+        folder: normalized,
+      });
+    } catch (error) {
+      set({ error: `Failed to update conversation folder: ${error}` });
     }
   },
 

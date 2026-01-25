@@ -92,6 +92,18 @@ pub async fn update_conversation_tags(
     save_db(app, &db)
 }
 
+pub async fn update_conversation_folder(
+    app: &AppHandle,
+    id: &str,
+    folder: Option<&str>,
+) -> Result<()> {
+    let mut db = load_db(app);
+    if let Some(conv) = db.conversations.iter_mut().find(|c| c.id == id) {
+        conv.folder = folder.map(|value| value.to_string());
+    }
+    save_db(app, &db)
+}
+
 pub async fn update_conversation_pinned(
     app: &AppHandle,
     id: &str,
@@ -175,6 +187,7 @@ pub async fn search_conversations(
                 snippet: "Title match".to_string(),
                 pinned: conv.pinned,
                 tags: conv.tags.clone(),
+                folder: conv.folder.clone(),
             });
             continue;
         }
@@ -191,6 +204,30 @@ pub async fn search_conversations(
                 snippet: format!("Tag: {}", tag),
                 pinned: conv.pinned,
                 tags: conv.tags.clone(),
+                folder: conv.folder.clone(),
+            });
+            continue;
+        }
+
+        if let Some(folder) = conv
+            .folder
+            .as_ref()
+            .and_then(|value| {
+                if value.to_lowercase().contains(&needle) {
+                    Some(value)
+                } else {
+                    None
+                }
+            })
+        {
+            results.push(SearchConversationResult {
+                id: conv.id.clone(),
+                title: conv.title.clone(),
+                updated_at: conv.updated_at.clone(),
+                snippet: format!("Folder: {}", folder),
+                pinned: conv.pinned,
+                tags: conv.tags.clone(),
+                folder: conv.folder.clone(),
             });
             continue;
         }
@@ -206,6 +243,7 @@ pub async fn search_conversations(
                     snippet,
                     pinned: conv.pinned,
                     tags: conv.tags.clone(),
+                    folder: conv.folder.clone(),
                 });
                 break;
             }
@@ -244,6 +282,7 @@ pub async fn clone_conversation(
         updated_at: now,
         pinned: false,
         tags: source.tags.clone(),
+        folder: source.folder.clone(),
     };
 
     db.conversations.insert(0, conversation.clone());

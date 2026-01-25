@@ -16,6 +16,8 @@ pub struct Conversation {
     pub pinned: bool,
     #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default)]
+    pub folder: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -63,6 +65,7 @@ pub struct SearchConversationResult {
     pub snippet: String,
     pub pinned: bool,
     pub tags: Vec<String>,
+    pub folder: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -372,6 +375,7 @@ pub async fn create_conversation(app: AppHandle, title: String) -> Result<Conver
         updated_at: now,
         pinned: false,
         tags: Vec::new(),
+        folder: None,
     };
     
     db::create_conversation(&app, &conversation).await
@@ -414,6 +418,16 @@ pub async fn update_conversation_tags(
 ) -> Result<(), String> {
     db::update_conversation_tags(&app, &conversation_id, &tags).await
         .map_err(|e| format!("Failed to update conversation tags: {}", e))
+}
+
+#[tauri::command]
+pub async fn update_conversation_folder(
+    app: AppHandle,
+    conversation_id: String,
+    folder: Option<String>,
+) -> Result<(), String> {
+    db::update_conversation_folder(&app, &conversation_id, folder.as_deref()).await
+        .map_err(|e| format!("Failed to update conversation folder: {}", e))
 }
 
 #[tauri::command]
@@ -461,6 +475,13 @@ pub async fn export_conversation_markdown(
         output.push_str("**Tags:** ");
         output.push_str(&conversation.tags.join(", "));
         output.push_str("\n\n");
+    }
+    if let Some(folder) = &conversation.folder {
+        if !folder.trim().is_empty() {
+            output.push_str("**Folder:** ");
+            output.push_str(folder);
+            output.push_str("\n\n");
+        }
     }
     output.push_str("*Exported from Multi-Model Chat*\n\n");
 

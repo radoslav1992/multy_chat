@@ -22,6 +22,7 @@ pub fn run() {
             commands::chat::update_conversation_title,
             commands::chat::update_conversation_pinned,
             commands::chat::update_conversation_tags,
+            commands::chat::update_conversation_folder,
             commands::chat::update_message_content,
             commands::chat::clone_conversation,
             commands::chat::export_conversation_markdown,

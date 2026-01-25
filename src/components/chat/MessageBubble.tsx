@@ -7,8 +7,9 @@ import {
   ChevronDown,
   ChevronRight,
   Pencil,
+  Square,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Message } from "@/stores/chatStore";
 import { MarkdownRenderer } from "@/components/preview/MarkdownRenderer";
 import { cn, getProviderColor, getProviderIcon } from "@/lib/utils";
@@ -21,6 +22,10 @@ interface MessageBubbleProps {
   onRegenerate?: () => void;
   canEdit?: boolean;
   onEdit?: () => void;
+  isStreaming?: boolean;
+  onStopStreaming?: () => void;
+  onStreamComplete?: () => void;
+  fullWidth?: boolean;
 }
 
 export function MessageBubble({
@@ -29,9 +34,14 @@ export function MessageBubble({
   onRegenerate,
   canEdit,
   onEdit,
+  isStreaming,
+  onStopStreaming,
+  onStreamComplete,
+  fullWidth,
 }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const [showSources, setShowSources] = useState(false);
+  const [visibleContent, setVisibleContent] = useState(message.content);
   const isUser = message.role === "user";
   const sources = message.sources ?? [];
 
@@ -40,6 +50,32 @@ export function MessageBubble({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  useEffect(() => {
+    if (!isStreaming || isUser) {
+      setVisibleContent(message.content);
+      return;
+    }
+
+    let cancelled = false;
+    let index = 0;
+    const content = message.content;
+    const chunkSize = 12;
+    const interval = setInterval(() => {
+      if (cancelled) return;
+      index = Math.min(index + chunkSize, content.length);
+      setVisibleContent(content.slice(0, index));
+      if (index >= content.length) {
+        clearInterval(interval);
+        onStreamComplete?.();
+      }
+    }, 20);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isStreaming, isUser, message.content, onStreamComplete]);
 
   return (
     <motion.div
@@ -70,7 +106,8 @@ export function MessageBubble({
       {/* Message Content */}
       <div
         className={cn(
-          "flex-1 max-w-[80%] space-y-2",
+          "flex-1 space-y-2",
+          fullWidth ? "max-w-full" : "max-w-[80%]",
           isUser ? "items-end" : "items-start"
         )}
       >
@@ -98,7 +135,7 @@ export function MessageBubble({
           {isUser ? (
             <p className="whitespace-pre-wrap">{message.content}</p>
           ) : (
-            <MarkdownRenderer content={message.content} />
+            <MarkdownRenderer content={visibleContent} />
           )}
         </div>
 
@@ -167,6 +204,17 @@ export function MessageBubble({
           </div>
         ) : (
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {isStreaming && onStopStreaming && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={onStopStreaming}
+                title="Stop response"
+              >
+                <Square className="h-3.5 w-3.5" />
+              </Button>
+            )}
             {canRegenerate && onRegenerate && (
               <Button
                 variant="ghost"

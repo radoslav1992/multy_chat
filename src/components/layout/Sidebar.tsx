@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
+import * as Popover from "@radix-ui/react-popover";
 import {
   MessageSquarePlus,
   Settings,
@@ -11,6 +12,7 @@ import {
   X,
   Pin,
   PinOff,
+  Filter,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -38,6 +40,9 @@ export function Sidebar({ isOpen }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<ConversationSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
+  const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
+  const [selectedFolderFilter, setSelectedFolderFilter] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [conversationToDelete, setConversationToDelete] = useState<{id: string, title: string} | null>(null);
 
@@ -82,6 +87,15 @@ export function Sidebar({ isOpen }: SidebarProps) {
     );
   };
 
+  const renderFolder = (folder?: string | null) => {
+    if (!folder) return null;
+    return (
+      <span className="px-2 py-0.5 rounded-full text-[10px] bg-primary/10 text-primary">
+        {folder}
+      </span>
+    );
+  };
+
   const handlePinToggle = async (
     e: React.MouseEvent,
     id: string,
@@ -95,6 +109,41 @@ export function Sidebar({ isOpen }: SidebarProps) {
       )
     );
   };
+
+  const availableTags = useMemo(() => {
+    const tags = new Set<string>();
+    conversations.forEach((conversation) => {
+      conversation.tags?.forEach((tag) => tags.add(tag));
+    });
+    return Array.from(tags).sort((a, b) => a.localeCompare(b));
+  }, [conversations]);
+
+  const availableFolders = useMemo(() => {
+    const folders = new Set<string>();
+    conversations.forEach((conversation) => {
+      if (conversation.folder) {
+        folders.add(conversation.folder);
+      }
+    });
+    return Array.from(folders).sort((a, b) => a.localeCompare(b));
+  }, [conversations]);
+
+  const applyFilters = <T extends { tags?: string[]; folder?: string | null }>(
+    items: T[]
+  ) => {
+    return items.filter((item) => {
+      if (selectedTagFilter && !item.tags?.includes(selectedTagFilter)) {
+        return false;
+      }
+      if (selectedFolderFilter && item.folder !== selectedFolderFilter) {
+        return false;
+      }
+      return true;
+    });
+  };
+
+  const filteredConversations = applyFilters(conversations);
+  const filteredSearchResults = applyFilters(searchResults);
 
   useEffect(() => {
     const trimmedQuery = searchQuery.trim();
@@ -172,6 +221,121 @@ export function Sidebar({ isOpen }: SidebarProps) {
                   </button>
                 )}
               </div>
+
+              {/* Filters */}
+              <div className="flex items-center justify-between text-xs">
+                <Popover.Root open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
+                  <Popover.Trigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 px-2">
+                      <Filter className="h-3.5 w-3.5 mr-1" />
+                      Filters
+                    </Button>
+                  </Popover.Trigger>
+                  <Popover.Portal>
+                    <Popover.Content
+                      className="w-64 rounded-xl border border-border bg-popover p-3 shadow-lg"
+                      sideOffset={8}
+                      align="start"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium">Filters</span>
+                        <button
+                          onClick={() => setFilterPopoverOpen(false)}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">
+                            Folders
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {availableFolders.length === 0 ? (
+                              <span className="text-xs text-muted-foreground">
+                                No folders yet
+                              </span>
+                            ) : (
+                              availableFolders.map((folder) => (
+                                <button
+                                  key={folder}
+                                  onClick={() =>
+                                    setSelectedFolderFilter(
+                                      selectedFolderFilter === folder ? null : folder
+                                    )
+                                  }
+                                  className={`px-2 py-1 rounded-md text-xs border ${
+                                    selectedFolderFilter === folder
+                                      ? "border-primary text-primary bg-primary/10"
+                                      : "border-border text-muted-foreground hover:text-foreground"
+                                  }`}
+                                >
+                                  {folder}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Tags</p>
+                          <div className="flex flex-wrap gap-1">
+                            {availableTags.length === 0 ? (
+                              <span className="text-xs text-muted-foreground">
+                                No tags yet
+                              </span>
+                            ) : (
+                              availableTags.map((tag) => (
+                                <button
+                                  key={tag}
+                                  onClick={() =>
+                                    setSelectedTagFilter(
+                                      selectedTagFilter === tag ? null : tag
+                                    )
+                                  }
+                                  className={`px-2 py-1 rounded-md text-xs border ${
+                                    selectedTagFilter === tag
+                                      ? "border-primary text-primary bg-primary/10"
+                                      : "border-border text-muted-foreground hover:text-foreground"
+                                  }`}
+                                >
+                                  {tag}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="mt-3 w-full"
+                        onClick={() => {
+                          setSelectedTagFilter(null);
+                          setSelectedFolderFilter(null);
+                        }}
+                        disabled={!selectedTagFilter && !selectedFolderFilter}
+                      >
+                        Clear filters
+                      </Button>
+                    </Popover.Content>
+                  </Popover.Portal>
+                </Popover.Root>
+                {(selectedTagFilter || selectedFolderFilter) && (
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    {selectedFolderFilter && (
+                      <span className="px-2 py-0.5 rounded-full bg-muted/60">
+                        {selectedFolderFilter}
+                      </span>
+                    )}
+                    {selectedTagFilter && (
+                      <span className="px-2 py-0.5 rounded-full bg-muted/60">
+                        {selectedTagFilter}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Conversations List */}
@@ -186,12 +350,12 @@ export function Sidebar({ isOpen }: SidebarProps) {
                     <p className="text-sm text-muted-foreground text-center py-8">
                       Searching...
                     </p>
-                  ) : searchResults.length === 0 ? (
+                  ) : filteredSearchResults.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-8">
                       No matches found
                     </p>
                   ) : (
-                    searchResults.map((conversation) => (
+                    filteredSearchResults.map((conversation) => (
                       <motion.div
                         key={conversation.id}
                         initial={{ opacity: 0, x: -20 }}
@@ -217,12 +381,15 @@ export function Sidebar({ isOpen }: SidebarProps) {
                             {truncateText(conversation.title, 25)}
                           </p>
                         </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {conversation.snippet
-                              ? truncateText(conversation.snippet, 60)
-                              : formatDate(conversation.updated_at)}
-                          </p>
-                        {renderTags(conversation.tags)}
+                        <div className="flex items-center flex-wrap gap-1 mt-0.5 text-xs text-muted-foreground">
+                          {conversation.snippet
+                            ? truncateText(conversation.snippet, 60)
+                            : formatDate(conversation.updated_at)}
+                        </div>
+                        <div className="flex items-center flex-wrap gap-1 mt-1">
+                          {renderFolder(conversation.folder)}
+                          {renderTags(conversation.tags)}
+                        </div>
                         </button>
 
                         <AnimatePresence>
@@ -276,8 +443,12 @@ export function Sidebar({ isOpen }: SidebarProps) {
                       </motion.div>
                     ))
                   )
+                ) : filteredConversations.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No conversations match the filters
+                  </p>
                 ) : (
-                  conversations.map((conversation) => (
+                  filteredConversations.map((conversation) => (
                     <motion.div
                       key={conversation.id}
                       initial={{ opacity: 0, x: -20 }}
@@ -303,10 +474,13 @@ export function Sidebar({ isOpen }: SidebarProps) {
                             {truncateText(conversation.title, 25)}
                           </p>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
+                        <div className="flex items-center flex-wrap gap-1 mt-0.5 text-xs text-muted-foreground">
                           {formatDate(conversation.updated_at)}
-                        </p>
-                        {renderTags(conversation.tags)}
+                        </div>
+                        <div className="flex items-center flex-wrap gap-1 mt-1">
+                          {renderFolder(conversation.folder)}
+                          {renderTags(conversation.tags)}
+                        </div>
                       </button>
 
                       <AnimatePresence>

@@ -1,7 +1,7 @@
 import { useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Send, BookOpen, X, Sparkles } from "lucide-react";
+import { Send, BookOpen, X, Sparkles, Square } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useChatStore } from "@/stores/chatStore";
 import { useKnowledgeStore } from "@/stores/knowledgeStore";
@@ -38,6 +38,8 @@ interface InputAreaProps {
   placeholder?: string;
   isEditing?: boolean;
   onCancelEdit?: () => void;
+  isStreaming?: boolean;
+  onStopStreaming?: () => void;
 }
 
 export function InputArea({
@@ -48,6 +50,8 @@ export function InputArea({
   placeholder,
   isEditing,
   onCancelEdit,
+  isStreaming,
+  onStopStreaming,
 }: InputAreaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { selectedBucketIds, setSelectedBucketIds } = useChatStore();
@@ -200,7 +204,18 @@ export function InputArea({
           />
 
           {/* Send Button */}
-          <div className="flex items-end p-2">
+          <div className="flex items-end p-2 gap-1">
+            {isStreaming && onStopStreaming && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-xl flex-shrink-0"
+                onClick={onStopStreaming}
+                title="Stop response"
+              >
+                <Square className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               variant="default"
               size="icon"

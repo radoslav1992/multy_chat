@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MessageSquare,
@@ -12,6 +12,9 @@ import {
   GitBranch,
   Plus,
   X,
+  Folder,
+  LayoutGrid,
+  Pencil,
 } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { save } from "@tauri-apps/plugin-dialog";
@@ -42,6 +45,7 @@ export function ChatWindow() {
     compareResponse,
     updateMessageContent,
     updateConversationTags,
+    updateConversationFolder,
     cloneConversation,
     exportConversation,
     conversations,
@@ -55,15 +59,29 @@ export function ChatWindow() {
   const { toast } = useToast();
   
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastStreamedIdRef = useRef<string | null>(null);
   const [input, setInput] = useState("");
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
+  const [folderInput, setFolderInput] = useState("");
+  const [folderPopoverOpen, setFolderPopoverOpen] = useState(false);
+  const [compareView, setCompareView] = useState(false);
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  const [isStreaming, setIsStreaming] = useState(false);
 
   const currentConversation = conversations.find(
     (conversation) => conversation.id === currentConversationId
   );
   const currentTags = currentConversation?.tags ?? [];
+  const currentFolder = currentConversation?.folder ?? null;
+  const folderOptions = Array.from(
+    new Set(
+      conversations
+        .map((conversation) => conversation.folder)
+        .filter((folder): folder is string => !!folder && folder.trim().length > 0)
+    )
+  ).sort((a, b) => a.localeCompare(b));
 
   useEffect(() => {
     loadAllApiKeys();
@@ -78,6 +96,8 @@ export function ChatWindow() {
 
   useEffect(() => {
     setEditingMessageId(null);
+    setIsStreaming(false);
+    setStreamingMessageId(null);
   }, [currentConversationId]);
 
   useEffect(() => {
@@ -85,6 +105,24 @@ export function ChatWindow() {
       setTagInput("");
     }
   }, [tagPopoverOpen]);
+
+  useEffect(() => {
+    if (!folderPopoverOpen) {
+      setFolderInput("");
+    }
+  }, [folderPopoverOpen]);
+
+  useEffect(() => {
+    if (!messages.length) return;
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage.role !== "assistant") return;
+
+    if (lastStreamedIdRef.current === lastMessage.id) return;
+
+    lastStreamedIdRef.current = lastMessage.id;
+    setStreamingMessageId(lastMessage.id);
+    setIsStreaming(true);
+  }, [messages]);
 
   const trimSnippet = (content: string, maxLength = 400) => {
     if (content.length <= maxLength) return content;
@@ -273,6 +311,30 @@ export function ChatWindow() {
     await updateConversationTags(currentConversationId, nextTags);
   };
 
+  const handleSetFolder = async (folder?: string | null) => {
+    if (!currentConversationId) return;
+    await updateConversationFolder(currentConversationId, folder ?? null);
+  };
+
+  const handleAddFolder = async () => {
+    if (!currentConversationId) return;
+    const trimmed = folderInput.trim();
+    if (!trimmed) return;
+    await handleSetFolder(trimmed);
+    setFolderInput("");
+    setFolderPopoverOpen(false);
+  };
+
+  const handleStopStreaming = () => {
+    setIsStreaming(false);
+    setStreamingMessageId(null);
+  };
+
+  const handleStreamComplete = () => {
+    setIsStreaming(false);
+    setStreamingMessageId(null);
+  };
+
   const handleExport = async () => {
     if (!currentConversationId) return;
 
@@ -307,6 +369,34 @@ export function ChatWindow() {
 
   const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
   const lastUserId = [...messages].reverse().find((m) => m.role === "user")?.id;
+  const streamingId = isStreaming ? streamingMessageId : null;
+
+  const turns = useMemo(() => {
+    const result: { user: Message; assistants: Message[] }[] = [];
+    let currentUser: Message | null = null;
+    let currentAssistants: Message[] = [];
+
+    for (const message of messages) {
+      if (message.role === "user") {
+        if (currentUser) {
+          result.push({ user: currentUser, assistants: currentAssistants });
+        }
+        currentUser = message;
+        currentAssistants = [];
+        continue;
+      }
+
+      if (message.role === "assistant" && currentUser) {
+        currentAssistants.push(message);
+      }
+    }
+
+    if (currentUser) {
+      result.push({ user: currentUser, assistants: currentAssistants });
+    }
+
+    return result;
+  }, [messages]);
 
   return (
     <div className="flex flex-col h-full">
@@ -328,6 +418,80 @@ export function ChatWindow() {
         <div className="flex items-center gap-2 flex-shrink-0">
           <KnowledgeSelector />
           <ModelSelector />
+          <Popover.Root open={folderPopoverOpen} onOpenChange={setFolderPopoverOpen}>
+            <Popover.Trigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Set folder"
+                disabled={!currentConversationId}
+                className={currentFolder ? "text-primary" : ""}
+              >
+                <Folder className="h-5 w-5" />
+              </Button>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content
+                className="w-72 rounded-xl border border-border bg-popover p-3 shadow-lg"
+                sideOffset={8}
+                align="end"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">Folder</span>
+                  <button
+                    onClick={() => setFolderPopoverOpen(false)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                {folderOptions.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {folderOptions.map((folder) => (
+                      <button
+                        key={folder}
+                        onClick={() => handleSetFolder(folder)}
+                        className={`px-2 py-1 rounded-md text-xs border ${
+                          currentFolder === folder
+                            ? "border-primary text-primary bg-primary/10"
+                            : "border-border text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {folder}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-center gap-2 mb-2">
+                  <Input
+                    value={folderInput}
+                    onChange={(e) => setFolderInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAddFolder()}
+                    placeholder="New folder"
+                    className="h-8"
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={handleAddFolder}
+                    disabled={!folderInput.trim()}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-center"
+                  onClick={() => handleSetFolder(null)}
+                  disabled={!currentFolder}
+                >
+                  Clear folder
+                </Button>
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
           <Popover.Root open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
             <Popover.Trigger asChild>
               <Button
@@ -409,6 +573,15 @@ export function ChatWindow() {
           <Button
             variant="ghost"
             size="icon"
+            onClick={() => setCompareView((prev) => !prev)}
+            title={compareView ? "Exit compare view" : "Compare view"}
+            className={compareView ? "text-primary" : ""}
+          >
+            <LayoutGrid className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={handleCompare}
             title="Compare with selected model"
             disabled={!currentConversationId || !lastUserId || isLoading}
@@ -469,6 +642,59 @@ export function ChatWindow() {
                   </motion.div>
                 )}
               </motion.div>
+            ) : compareView ? (
+              <div className="space-y-6">
+                {turns.map((turn) => (
+                  <div key={turn.user.id} className="space-y-4">
+                    <div className="rounded-xl border border-border bg-primary/5 px-4 py-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs text-muted-foreground">User</p>
+                        {turn.user.id === lastUserId && !isLoading && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => handleEditMessage(turn.user)}
+                            title="Edit message"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                      <p className="whitespace-pre-wrap text-sm">{turn.user.content}</p>
+                    </div>
+                    {turn.assistants.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Awaiting assistant response...
+                      </p>
+                    ) : (
+                      <div
+                        className={`grid gap-4 ${
+                          turn.assistants.length > 1 ? "md:grid-cols-2" : "grid-cols-1"
+                        }`}
+                      >
+                        {turn.assistants.map((assistant) => (
+                          <MessageBubble
+                            key={assistant.id}
+                            message={assistant}
+                            isLast={assistant.id === lastAssistantId}
+                            canRegenerate={assistant.id === lastAssistantId && !isLoading}
+                            onRegenerate={
+                              assistant.id === lastAssistantId ? handleRegenerate : undefined
+                            }
+                            isStreaming={assistant.id === streamingId}
+                            onStopStreaming={assistant.id === streamingId ? handleStopStreaming : undefined}
+                            onStreamComplete={
+                              assistant.id === streamingId ? handleStreamComplete : undefined
+                            }
+                            fullWidth
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             ) : (
               messages.map((message, index) => (
                 <MessageBubble
@@ -483,6 +709,9 @@ export function ChatWindow() {
                       ? () => handleEditMessage(message)
                       : undefined
                   }
+                  isStreaming={message.id === streamingId}
+                  onStopStreaming={message.id === streamingId ? handleStopStreaming : undefined}
+                  onStreamComplete={message.id === streamingId ? handleStreamComplete : undefined}
                 />
               ))
             )}
@@ -547,6 +776,8 @@ export function ChatWindow() {
         onChange={setInput}
         onSend={handleSend}
         disabled={isLoading || !hasApiKey}
+        isStreaming={isStreaming}
+        onStopStreaming={handleStopStreaming}
         isEditing={!!editingMessageId}
         onCancelEdit={editingMessageId ? handleCancelEdit : undefined}
         placeholder={
