@@ -369,7 +369,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
             className="flex flex-col border-r border-border/50 bg-card/50 backdrop-blur-xl h-full overflow-hidden"
           >
             {/* Header */}
-            <div className="p-4 pb-3 space-y-4">
+            <div className="p-4 pb-3 space-y-4 flex-shrink-0">
               {/* Logo */}
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-gradient-primary flex items-center justify-center shadow-md shadow-primary/20 flex-shrink-0">
@@ -383,7 +383,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
             </div>
 
             {/* Tab Switcher */}
-            <div className="flex mx-4 p-1 bg-muted/50 rounded-xl">
+            <div className="flex mx-4 p-1 bg-muted/50 rounded-xl flex-shrink-0">
               <button
                 onClick={() => setSidebarTab("chats")}
                 className={cn(
@@ -420,8 +420,8 @@ export function Sidebar({ isOpen }: SidebarProps) {
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden mt-3">
               {/* Chats Tab Content */}
               {sidebarTab === "chats" && (
-                <div className="flex-1 flex flex-col min-h-0">
-                <div className="px-4 space-y-3">
+                <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                  <div className="px-4 space-y-3 flex-shrink-0">
                   {/* New Chat Button */}
                   <Button
                     onClick={handleNewChat}
@@ -568,49 +568,49 @@ export function Sidebar({ isOpen }: SidebarProps) {
                   </div>
                 </div>
 
-                {/* Conversations List */}
-                <ScrollArea className="flex-1 px-2 mt-3">
-                  <div className="space-y-1 pb-4">
-                    {conversations.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                        <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mb-3">
-                          <MessageSquarePlus className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                        <p className="text-sm font-medium text-muted-foreground">No conversations yet</p>
-                        <p className="text-xs text-muted-foreground/60 mt-1">
-                          Start a new chat to begin
-                        </p>
-                      </div>
-                    ) : searchQuery.trim() ? (
-                      isSearching ? (
-                        <div className="flex items-center justify-center py-12">
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                            <span className="text-sm">Searching...</span>
-                          </div>
-                        </div>
-                      ) : filteredSearchResults.length === 0 ? (
+                  {/* Conversations List */}
+                  <ScrollArea className="flex-1 mt-3">
+                    <div className="px-2 space-y-1 pb-4">
+                      {conversations.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                          <Search className="h-8 w-8 text-muted-foreground/40 mb-3" />
-                          <p className="text-sm text-muted-foreground">No matches found</p>
+                          <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mb-3">
+                            <MessageSquarePlus className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                          <p className="text-sm font-medium text-muted-foreground">No conversations yet</p>
+                          <p className="text-xs text-muted-foreground/60 mt-1">
+                            Start a new chat to begin
+                          </p>
+                        </div>
+                      ) : searchQuery.trim() ? (
+                        isSearching ? (
+                          <div className="flex items-center justify-center py-12">
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                              <span className="text-sm">Searching...</span>
+                            </div>
+                          </div>
+                        ) : filteredSearchResults.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                            <Search className="h-8 w-8 text-muted-foreground/40 mb-3" />
+                            <p className="text-sm text-muted-foreground">No matches found</p>
+                          </div>
+                        ) : (
+                          filteredSearchResults.map((conversation) => (
+                            <ConversationItem key={conversation.id} conversation={conversation} isSearchResult />
+                          ))
+                        )
+                      ) : filteredConversations.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                          <Filter className="h-8 w-8 text-muted-foreground/40 mb-3" />
+                          <p className="text-sm text-muted-foreground">No matches</p>
                         </div>
                       ) : (
-                        filteredSearchResults.map((conversation) => (
-                          <ConversationItem key={conversation.id} conversation={conversation} isSearchResult />
+                        filteredConversations.map((conversation) => (
+                          <ConversationItem key={conversation.id} conversation={conversation} />
                         ))
-                      )
-                    ) : filteredConversations.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                        <Filter className="h-8 w-8 text-muted-foreground/40 mb-3" />
-                        <p className="text-sm text-muted-foreground">No matches</p>
-                      </div>
-                    ) : (
-                      filteredConversations.map((conversation) => (
-                        <ConversationItem key={conversation.id} conversation={conversation} />
-                      ))
-                    )}
-                  </div>
-                </ScrollArea>
+                      )}
+                    </div>
+                  </ScrollArea>
                 </div>
               )}
 
@@ -757,7 +757,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
             </div>
 
             {/* Footer */}
-            <div className="p-3 border-t border-border/50 bg-card/30">
+            <div className="p-3 border-t border-border/50 bg-card/30 flex-shrink-0">
               <div className="flex items-center gap-1">
                 <Button
                   variant="ghost"
