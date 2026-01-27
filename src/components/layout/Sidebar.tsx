@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import * as Popover from "@radix-ui/react-popover";
-import * as Tabs from "@radix-ui/react-tabs";
 import {
   MessageSquarePlus,
   Settings,
@@ -287,9 +286,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
   }, [searchQuery, searchConversations, conversations]);
 
   const ConversationItem = ({ conversation, isSearchResult = false }: { conversation: typeof conversations[0] | ConversationSearchResult, isSearchResult?: boolean }) => (
-    <motion.div
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
+    <div
       className="relative group"
       onMouseEnter={() => setHoveredId(conversation.id)}
       onMouseLeave={() => setHoveredId(null)}
@@ -297,7 +294,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
       <button
         onClick={() => selectConversation(conversation.id)}
         className={cn(
-          "w-full text-left px-3 py-2.5 rounded-xl transition-all duration-200",
+          "w-full text-left px-3 py-2.5 rounded-xl transition-colors",
           "hover:bg-accent/50",
           currentConversationId === conversation.id
             ? "bg-primary/10 border border-primary/20"
@@ -326,41 +323,38 @@ export function Sidebar({ isOpen }: SidebarProps) {
         </div>
       </button>
 
-      <AnimatePresence>
-        {hoveredId === conversation.id && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 bg-background/90 backdrop-blur-sm rounded-lg p-0.5 border border-border shadow-sm"
-          >
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-primary"
-              onClick={(e) =>
-                handlePinToggle(e, conversation.id, conversation.pinned)
-              }
-              title={conversation.pinned ? "Unpin" : "Pin"}
-            >
-              {conversation.pinned ? (
-                <PinOff className="h-3.5 w-3.5" />
-              ) : (
-                <Pin className="h-3.5 w-3.5" />
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-destructive"
-              onClick={(e) => handleDeleteClick(e, conversation.id, conversation.title)}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </motion.div>
+      {/* Hover actions - no animation */}
+      <div
+        className={cn(
+          "absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 bg-background/95 backdrop-blur-sm rounded-lg p-0.5 border border-border shadow-sm transition-opacity",
+          hoveredId === conversation.id ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
-      </AnimatePresence>
-    </motion.div>
+      >
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-muted-foreground hover:text-primary"
+          onClick={(e) =>
+            handlePinToggle(e, conversation.id, conversation.pinned)
+          }
+          title={conversation.pinned ? "Unpin" : "Pin"}
+        >
+          {conversation.pinned ? (
+            <PinOff className="h-3.5 w-3.5" />
+          ) : (
+            <Pin className="h-3.5 w-3.5" />
+          )}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+          onClick={(e) => handleDeleteClick(e, conversation.id, conversation.title)}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>
   );
 
   return (
@@ -388,47 +382,45 @@ export function Sidebar({ isOpen }: SidebarProps) {
               </div>
             </div>
 
-            {/* Tabs */}
-            <Tabs.Root
-              value={sidebarTab}
-              onValueChange={(value) => setSidebarTab(value as SidebarTab)}
-              className="flex-1 flex flex-col min-h-0"
-            >
-              <Tabs.List className="flex mx-4 p-1 bg-muted/50 rounded-xl">
-                <Tabs.Trigger
-                  value="chats"
-                  className={cn(
-                    "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all",
-                    sidebarTab === "chats"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <MessageSquare className="h-4 w-4" />
-                  Chats
-                </Tabs.Trigger>
-                <Tabs.Trigger
-                  value="knowledge"
-                  className={cn(
-                    "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all",
-                    sidebarTab === "knowledge"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground",
-                    selectedBucketIds.length > 0 && sidebarTab !== "knowledge" && "text-primary"
-                  )}
-                >
-                  <BookOpen className="h-4 w-4" />
-                  Knowledge
-                  {selectedBucketIds.length > 0 && (
-                    <span className="w-5 h-5 rounded-md bg-primary text-primary-foreground text-xs flex items-center justify-center font-semibold">
-                      {selectedBucketIds.length}
-                    </span>
-                  )}
-                </Tabs.Trigger>
-              </Tabs.List>
+            {/* Tab Switcher */}
+            <div className="flex mx-4 p-1 bg-muted/50 rounded-xl">
+              <button
+                onClick={() => setSidebarTab("chats")}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all",
+                  sidebarTab === "chats"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <MessageSquare className="h-4 w-4" />
+                Chats
+              </button>
+              <button
+                onClick={() => setSidebarTab("knowledge")}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all",
+                  sidebarTab === "knowledge"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                  selectedBucketIds.length > 0 && sidebarTab !== "knowledge" && "text-primary"
+                )}
+              >
+                <BookOpen className="h-4 w-4" />
+                Knowledge
+                {selectedBucketIds.length > 0 && (
+                  <span className="w-5 h-5 rounded-md bg-primary text-primary-foreground text-xs flex items-center justify-center font-semibold">
+                    {selectedBucketIds.length}
+                  </span>
+                )}
+              </button>
+            </div>
 
+            {/* Tab Content */}
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden mt-3">
               {/* Chats Tab Content */}
-              <Tabs.Content value="chats" className="flex-1 flex flex-col min-h-0 mt-3">
+              {sidebarTab === "chats" && (
+                <div className="flex-1 flex flex-col min-h-0">
                 <div className="px-4 space-y-3">
                   {/* New Chat Button */}
                   <Button
@@ -619,10 +611,12 @@ export function Sidebar({ isOpen }: SidebarProps) {
                     )}
                   </div>
                 </ScrollArea>
-              </Tabs.Content>
+                </div>
+              )}
 
               {/* Knowledge Tab Content */}
-              <Tabs.Content value="knowledge" className="flex-1 flex flex-col min-h-0 mt-3">
+              {sidebarTab === "knowledge" && (
+                <div className="flex-1 flex flex-col min-h-0">
                 <div className="px-4 space-y-3">
                   {/* New Bucket Button */}
                   <Button
@@ -757,8 +751,9 @@ export function Sidebar({ isOpen }: SidebarProps) {
                     </p>
                   </div>
                 )}
-              </Tabs.Content>
-            </Tabs.Root>
+                </div>
+              )}
+            </div>
 
             {/* Footer */}
             <div className="p-3 border-t border-border/50 bg-card/30">
