@@ -14,6 +14,8 @@ import {
   X,
 } from "lucide-react";
 import mermaid from "mermaid";
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeFile } from "@tauri-apps/plugin-fs";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
@@ -172,23 +174,27 @@ export function MermaidPreview({ code }: MermaidPreviewProps) {
   }, []);
 
   // Download handlers
-  const downloadAsSVG = useCallback(() => {
+  const downloadAsSVG = useCallback(async () => {
     if (!svg) return;
     
-    const blob = new Blob([svg], { type: "image/svg+xml" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "mermaid-diagram.svg";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      const filePath = await save({
+        defaultPath: "mermaid-diagram.svg",
+        filters: [{ name: "SVG Image", extensions: ["svg"] }],
+      });
+      
+      if (filePath) {
+        const encoder = new TextEncoder();
+        await writeFile(filePath, encoder.encode(svg));
+      }
+    } catch (err) {
+      console.error("Failed to save SVG:", err);
+    }
     setShowDownloadMenu(false);
   }, [svg]);
 
   const downloadAsPNG = useCallback(async () => {
-    if (!svg || !diagramRef.current) return;
+    if (!svg) return;
 
     try {
       // Create a canvas element
@@ -201,36 +207,60 @@ export function MermaidPreview({ code }: MermaidPreviewProps) {
       const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
       const url = URL.createObjectURL(svgBlob);
 
-      img.onload = () => {
-        // Set canvas size with higher resolution for better quality
-        const scale = 2;
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        
-        // Fill with white background
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Draw the image
-        ctx.scale(scale, scale);
-        ctx.drawImage(img, 0, 0);
+      img.onload = async () => {
+        try {
+          // Set canvas size with higher resolution for better quality
+          const scale = 2;
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          
+          // Fill with white background
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
+          // Draw the image
+          ctx.scale(scale, scale);
+          ctx.drawImage(img, 0, 0);
 
-        // Download
-        const pngUrl = canvas.toDataURL("image/png");
-        const a = document.createElement("a");
-        a.href = pngUrl;
-        a.download = "mermaid-diagram.png";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+          // Get PNG data as base64
+          const dataUrl = canvas.toDataURL("image/png");
+          const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
+          
+          // Convert base64 to Uint8Array
+          const binaryString = atob(base64Data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+
+          // Open save dialog
+          const filePath = await save({
+            defaultPath: "mermaid-diagram.png",
+            filters: [{ name: "PNG Image", extensions: ["png"] }],
+          });
+          
+          if (filePath) {
+            await writeFile(filePath, bytes);
+          }
+          
+          URL.revokeObjectURL(url);
+        } catch (err) {
+          console.error("Failed to save PNG:", err);
+        }
+        setShowDownloadMenu(false);
+      };
+
+      img.onerror = () => {
+        console.error("Failed to load SVG image");
         URL.revokeObjectURL(url);
+        setShowDownloadMenu(false);
       };
 
       img.src = url;
     } catch (err) {
       console.error("Failed to download PNG:", err);
+      setShowDownloadMenu(false);
     }
-    setShowDownloadMenu(false);
   }, [svg]);
 
   // Fullscreen toggle
