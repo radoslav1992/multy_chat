@@ -87,12 +87,10 @@ fn find_whisper_binary() -> Option<String> {
     ];
 
     #[cfg(target_os = "windows")]
-    {
-        candidates = candidates
-            .into_iter()
-            .flat_map(|name| vec![name.to_string(), format!("{}.exe", name)])
-            .collect();
-    }
+    let candidates: Vec<String> = candidates
+        .into_iter()
+        .flat_map(|name| vec![name.to_string(), format!("{}.exe", name)])
+        .collect();
 
     #[cfg(not(target_os = "windows"))]
     let candidates: Vec<String> = candidates.into_iter().map(|s| s.to_string()).collect();
