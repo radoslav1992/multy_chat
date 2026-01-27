@@ -27,6 +27,7 @@ import { KnowledgeSelector } from "./KnowledgeSelector";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toaster";
+import { cn } from "@/lib/utils";
 import { Message, useChatStore, Provider } from "@/stores/chatStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useKnowledgeStore } from "@/stores/knowledgeStore";
@@ -482,23 +483,29 @@ export function ChatWindow() {
   }, [messages]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-gradient-to-b from-muted/30 to-transparent">
       {/* Header with Model Selector */}
-      <header className="flex items-center px-4 py-3 border-b border-border bg-card/50 backdrop-blur-sm gap-2 min-h-[60px]">
-        <div className="flex items-center gap-2 flex-shrink-0">
+      <header className="flex items-center px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-xl gap-3 min-h-[64px]">
+        <div className="flex items-center gap-3 flex-shrink-0">
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleSidebar}
-            className={sidebarOpen ? "text-primary" : ""}
+            className={cn("rounded-xl", sidebarOpen && "bg-primary/10 text-primary")}
             title="Toggle Chat History"
           >
             <PanelLeft className="h-5 w-5" />
           </Button>
-          <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
-          <h1 className="font-semibold text-base whitespace-nowrap hidden md:block">Multi-Model Chat</h1>
+          {!sidebarOpen && (
+            <div className="flex items-center gap-2 pl-1">
+              <div className="w-7 h-7 rounded-lg bg-gradient-primary flex items-center justify-center shadow-sm shadow-primary/20">
+                <Sparkles className="h-3.5 w-3.5 text-white" />
+              </div>
+              <h1 className="font-semibold text-sm whitespace-nowrap hidden md:block">Multi-Model Chat</h1>
+            </div>
+          )}
         </div>
-        <div className="flex items-center gap-1 flex-1 justify-end overflow-x-auto">
+        <div className="flex items-center gap-1.5 flex-1 justify-end overflow-x-auto">
           <KnowledgeSelector />
           <ModelSelector />
           <Popover.Root open={folderPopoverOpen} onOpenChange={setFolderPopoverOpen}>
@@ -515,30 +522,31 @@ export function ChatWindow() {
             </Popover.Trigger>
             <Popover.Portal>
               <Popover.Content
-                className="w-72 rounded-xl border border-border bg-popover p-3 shadow-lg"
+                className="w-72 rounded-2xl border border-border bg-popover/95 backdrop-blur-xl p-4 shadow-xl animate-fade-in"
                 sideOffset={8}
                 align="end"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Folder</span>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-semibold">Folder</span>
                   <button
                     onClick={() => setFolderPopoverOpen(false)}
-                    className="text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
                 {folderOptions.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-3">
+                  <div className="flex flex-wrap gap-1.5 mb-3">
                     {folderOptions.map((folder) => (
                       <button
                         key={folder}
                         onClick={() => handleSetFolder(folder)}
-                        className={`px-2 py-1 rounded-md text-xs border ${
+                        className={cn(
+                          "px-2.5 py-1 rounded-lg text-xs font-medium transition-all",
                           currentFolder === folder
-                            ? "border-primary text-primary bg-primary/10"
-                            : "border-border text-muted-foreground hover:text-foreground"
-                        }`}
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                        )}
                       >
                         {folder}
                       </button>
@@ -582,40 +590,41 @@ export function ChatWindow() {
                 size="icon"
                 title="Manage tags"
                 disabled={!currentConversationId}
+                className={cn("rounded-xl", currentTags.length > 0 && "text-primary")}
               >
                 <Tag className="h-5 w-5" />
               </Button>
             </Popover.Trigger>
             <Popover.Portal>
               <Popover.Content
-                className="w-72 rounded-xl border border-border bg-popover p-3 shadow-lg"
+                className="w-72 rounded-2xl border border-border bg-popover/95 backdrop-blur-xl p-4 shadow-xl animate-fade-in"
                 sideOffset={8}
                 align="end"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Tags</span>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-semibold">Tags</span>
                   <button
                     onClick={() => setTagPopoverOpen(false)}
-                    className="text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
                 {currentTags.length === 0 ? (
-                  <p className="text-xs text-muted-foreground mb-3">
+                  <p className="text-xs text-muted-foreground/70 mb-3">
                     Add tags to organize conversations.
                   </p>
                 ) : (
-                  <div className="flex flex-wrap gap-1 mb-3">
+                  <div className="flex flex-wrap gap-1.5 mb-3">
                     {currentTags.map((tag) => (
                       <span
                         key={tag}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-xs font-medium"
                       >
                         {tag}
                         <button
                           onClick={() => handleRemoveTag(tag)}
-                          className="hover:bg-primary/20 rounded-full p-0.5"
+                          className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -650,6 +659,7 @@ export function ChatWindow() {
             onClick={handleFork}
             title="Fork conversation"
             disabled={!currentConversationId}
+            className="rounded-xl"
           >
             <GitBranch className="h-5 w-5" />
           </Button>
@@ -658,7 +668,7 @@ export function ChatWindow() {
             size="icon"
             onClick={() => setCompareView((prev) => !prev)}
             title={compareView ? "Exit compare view" : "Compare view"}
-            className={compareView ? "text-primary" : ""}
+            className={cn("rounded-xl", compareView && "bg-primary/10 text-primary")}
           >
             <LayoutGrid className="h-5 w-5" />
           </Button>
@@ -668,6 +678,7 @@ export function ChatWindow() {
             onClick={handleCompare}
             title="Compare with selected model"
             disabled={!currentConversationId || !lastUserId || isLoading}
+            className="rounded-xl"
           >
             <GitCompare className="h-5 w-5" />
           </Button>
@@ -677,6 +688,7 @@ export function ChatWindow() {
             onClick={handleExport}
             title="Export conversation"
             disabled={!currentConversationId}
+            className="rounded-xl"
           >
             <Download className="h-5 w-5" />
           </Button>
@@ -684,7 +696,7 @@ export function ChatWindow() {
             variant="ghost"
             size="icon"
             onClick={toggleKnowledgeSidebar}
-            className={knowledgeSidebarOpen ? "text-primary" : ""}
+            className={cn("rounded-xl", knowledgeSidebarOpen && "bg-primary/10 text-primary")}
             title="Toggle Knowledge Sidebar"
           >
             <PanelRight className="h-5 w-5" />
@@ -722,28 +734,43 @@ export function ChatWindow() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex flex-col items-center justify-center min-h-[400px] text-center"
+                className="flex flex-col items-center justify-center min-h-[400px] text-center px-4"
               >
-                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-                  <MessageSquare className="h-8 w-8 text-primary" />
+                <div className="w-20 h-20 rounded-3xl bg-gradient-primary flex items-center justify-center mb-6 shadow-lg shadow-primary/30">
+                  <Sparkles className="h-10 w-10 text-white" />
                 </div>
-                <h2 className="text-xl font-semibold mb-2">
-                  Start a New Conversation
+                <h2 className="text-2xl font-bold mb-3 tracking-tight">
+                  Start a Conversation
                 </h2>
-                <p className="text-muted-foreground max-w-md">
-                  Choose your AI provider and model above, then type your message
-                  below to begin chatting.
+                <p className="text-muted-foreground max-w-md leading-relaxed">
+                  Choose your AI provider and model, then type your message to begin.
+                  You can switch models anytime during the conversation.
                 </p>
+                
+                {/* Quick start suggestions */}
+                <div className="flex flex-wrap justify-center gap-2 mt-6 max-w-lg">
+                  {["Explain quantum computing", "Write a poem", "Debug my code", "Create a plan"].map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      onClick={() => setInput(suggestion)}
+                      className="px-4 py-2 rounded-xl bg-card border border-border text-sm hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+
                 {!hasApiKey && (
                   <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="mt-4 p-3 bg-destructive/10 rounded-lg flex items-center gap-2 text-destructive"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-6 p-4 bg-destructive/10 rounded-2xl flex items-center gap-3 text-destructive border border-destructive/20"
                   >
-                    <AlertCircle className="h-4 w-4" />
-                    <span className="text-sm">
-                      Please add your {selectedProvider} API key in settings
-                    </span>
+                    <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium">API key required</p>
+                      <p className="text-xs opacity-80">Add your {selectedProvider} API key in settings to start</p>
+                    </div>
                   </motion.div>
                 )}
               </motion.div>

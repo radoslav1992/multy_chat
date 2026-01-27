@@ -21,6 +21,26 @@ function App() {
     initializeDatabase();
   }, [initializeDatabase]);
 
+  // Clean up orphaned mermaid error elements
+  useEffect(() => {
+    const cleanup = () => {
+      // Remove any mermaid error elements that escaped to body
+      const orphanedElements = document.body.querySelectorAll(
+        '[id^="d"]:not([class]), svg[id^="mermaid"]'
+      );
+      orphanedElements.forEach((el) => {
+        if (el.parentElement === document.body) {
+          el.remove();
+        }
+      });
+    };
+
+    cleanup();
+    // Run periodically to catch any new orphans
+    const interval = setInterval(cleanup, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <ToastProviderRoot>
       <div className="flex h-screen overflow-hidden bg-background">
