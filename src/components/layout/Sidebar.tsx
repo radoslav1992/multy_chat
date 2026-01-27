@@ -616,141 +616,142 @@ export function Sidebar({ isOpen }: SidebarProps) {
 
               {/* Knowledge Tab Content */}
               {sidebarTab === "knowledge" && (
-                <div className="flex-1 flex flex-col min-h-0">
-                <div className="px-4 space-y-3">
-                  {/* New Bucket Button */}
-                  <Button
-                    onClick={() => setIsCreatingBucket(true)}
-                    className="w-full justify-center gap-2 h-10 rounded-xl shadow-sm"
-                    variant="default"
-                  >
-                    <Plus className="h-4 w-4" />
-                    New Bucket
-                  </Button>
-                  
-                  <p className="text-xs text-muted-foreground">
-                    Add documents to enhance AI responses with your own knowledge.
-                  </p>
-
-                  {/* Search Buckets */}
-                  {buckets.length > 0 && (
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search buckets..."
-                        value={bucketSearchQuery}
-                        onChange={(e) => setBucketSearchQuery(e.target.value)}
-                        className="pl-9 pr-9 h-9 bg-background/50"
-                      />
-                      {bucketSearchQuery && (
-                        <button
-                          onClick={() => setBucketSearchQuery("")}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Create Bucket Form */}
-                <AnimatePresence>
-                  {isCreatingBucket && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="mx-4 mt-3 p-3 rounded-xl border border-border bg-muted/30 overflow-hidden"
+                <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                  {/* Fixed Header */}
+                  <div className="px-4 space-y-3 flex-shrink-0">
+                    {/* New Bucket Button */}
+                    <Button
+                      onClick={() => setIsCreatingBucket(true)}
+                      className="w-full justify-center gap-2 h-10 rounded-xl shadow-sm"
+                      variant="default"
                     >
-                      <Input
-                        placeholder="Bucket name"
-                        value={newBucketName}
-                        onChange={(e) => setNewBucketName(e.target.value)}
-                        className="mb-2"
-                        autoFocus
-                      />
-                      <Input
-                        placeholder="Description (optional)"
-                        value={newBucketDescription}
-                        onChange={(e) => setNewBucketDescription(e.target.value)}
-                        className="mb-3"
-                      />
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          onClick={handleCreateBucket}
-                          disabled={!newBucketName.trim()}
-                          className="flex-1"
-                        >
-                          Create
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setIsCreatingBucket(false);
-                            setNewBucketName("");
-                            setNewBucketDescription("");
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                      <Plus className="h-4 w-4" />
+                      New Bucket
+                    </Button>
+                    
+                    <p className="text-xs text-muted-foreground">
+                      Add documents to enhance AI responses with your own knowledge.
+                    </p>
 
-                {/* Buckets List */}
-                <ScrollArea className="flex-1 px-2 mt-3">
-                  <div className="space-y-2 pb-4">
-                    {isLoadingBuckets && buckets.length === 0 ? (
-                      <div className="flex items-center justify-center py-12">
-                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : buckets.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                        <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mb-3">
-                          <BookOpen className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                        <p className="text-sm font-medium text-muted-foreground">No buckets yet</p>
-                        <p className="text-xs text-muted-foreground/60 mt-1">
-                          Create one to add documents
-                        </p>
-                      </div>
-                    ) : filteredBuckets.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                        <Search className="h-8 w-8 text-muted-foreground/40 mb-3" />
-                        <p className="text-sm text-muted-foreground">No buckets match "{bucketSearchQuery}"</p>
-                      </div>
-                    ) : (
-                      filteredBuckets.map((bucket) => (
-                        <BucketItem
-                          key={bucket.id}
-                          bucket={bucket}
-                          isExpanded={expandedBuckets.has(bucket.id)}
-                          isSelected={selectedBucketIds.includes(bucket.id)}
-                          files={selectedBucketId === bucket.id ? bucketFiles : []}
-                          isUploading={isUploading}
-                          onToggleExpand={() => toggleBucketExpand(bucket.id)}
-                          onToggleSelect={() => toggleBucketSelection(bucket.id)}
-                          onDelete={() => handleBucketDeleteClick(bucket)}
-                          onUpload={() => handleUploadFile(bucket.id)}
-                          onDeleteFile={(fileId, filename) => deleteFile(bucket.id, fileId, filename)}
+                    {/* Search Buckets */}
+                    {buckets.length > 0 && (
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search buckets..."
+                          value={bucketSearchQuery}
+                          onChange={(e) => setBucketSearchQuery(e.target.value)}
+                          className="pl-9 pr-9 h-9 bg-background/50"
                         />
-                      ))
+                        {bucketSearchQuery && (
+                          <button
+                            onClick={() => setBucketSearchQuery("")}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
-                </ScrollArea>
 
-                {/* Active Buckets Footer */}
-                {selectedBucketIds.length > 0 && (
-                  <div className="mx-4 mb-3 p-3 rounded-xl bg-primary/10 border border-primary/20">
-                    <p className="text-xs text-primary font-medium">
-                      {selectedBucketIds.length} bucket{selectedBucketIds.length === 1 ? "" : "s"} active for chat
-                    </p>
-                  </div>
-                )}
+                  {/* Create Bucket Form */}
+                  <AnimatePresence>
+                    {isCreatingBucket && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="mx-4 mt-3 p-3 rounded-xl border border-border bg-muted/30 overflow-hidden flex-shrink-0"
+                      >
+                        <Input
+                          placeholder="Bucket name"
+                          value={newBucketName}
+                          onChange={(e) => setNewBucketName(e.target.value)}
+                          className="mb-2"
+                          autoFocus
+                        />
+                        <Input
+                          placeholder="Description (optional)"
+                          value={newBucketDescription}
+                          onChange={(e) => setNewBucketDescription(e.target.value)}
+                          className="mb-3"
+                        />
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            onClick={handleCreateBucket}
+                            disabled={!newBucketName.trim()}
+                            className="flex-1"
+                          >
+                            Create
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setIsCreatingBucket(false);
+                              setNewBucketName("");
+                              setNewBucketDescription("");
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Buckets List - Scrollable */}
+                  <ScrollArea className="flex-1 mt-3">
+                    <div className="px-2 space-y-2 pb-4">
+                      {isLoadingBuckets && buckets.length === 0 ? (
+                        <div className="flex items-center justify-center py-12">
+                          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : buckets.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                          <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mb-3">
+                            <BookOpen className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                          <p className="text-sm font-medium text-muted-foreground">No buckets yet</p>
+                          <p className="text-xs text-muted-foreground/60 mt-1">
+                            Create one to add documents
+                          </p>
+                        </div>
+                      ) : filteredBuckets.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                          <Search className="h-8 w-8 text-muted-foreground/40 mb-3" />
+                          <p className="text-sm text-muted-foreground">No buckets match "{bucketSearchQuery}"</p>
+                        </div>
+                      ) : (
+                        filteredBuckets.map((bucket) => (
+                          <BucketItem
+                            key={bucket.id}
+                            bucket={bucket}
+                            isExpanded={expandedBuckets.has(bucket.id)}
+                            isSelected={selectedBucketIds.includes(bucket.id)}
+                            files={selectedBucketId === bucket.id ? bucketFiles : []}
+                            isUploading={isUploading}
+                            onToggleExpand={() => toggleBucketExpand(bucket.id)}
+                            onToggleSelect={() => toggleBucketSelection(bucket.id)}
+                            onDelete={() => handleBucketDeleteClick(bucket)}
+                            onUpload={() => handleUploadFile(bucket.id)}
+                            onDeleteFile={(fileId, filename) => deleteFile(bucket.id, fileId, filename)}
+                          />
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+
+                  {/* Active Buckets Footer */}
+                  {selectedBucketIds.length > 0 && (
+                    <div className="mx-4 mb-3 p-3 rounded-xl bg-primary/10 border border-primary/20 flex-shrink-0">
+                      <p className="text-xs text-primary font-medium">
+                        {selectedBucketIds.length} bucket{selectedBucketIds.length === 1 ? "" : "s"} active for chat
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
