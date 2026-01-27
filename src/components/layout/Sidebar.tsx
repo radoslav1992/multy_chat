@@ -366,24 +366,25 @@ export function Sidebar({ isOpen }: SidebarProps) {
             animate={{ width: 320, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.2, ease: "easeInOut" }}
-            className="flex flex-col border-r border-border/50 bg-card/50 backdrop-blur-xl h-full overflow-hidden"
+            className="border-r border-border/50 bg-card/50 backdrop-blur-xl h-screen max-h-screen overflow-hidden"
           >
-            {/* Header */}
-            <div className="p-4 pb-3 space-y-4 flex-shrink-0">
-              {/* Logo */}
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-primary flex items-center justify-center shadow-md shadow-primary/20 flex-shrink-0">
-                  <Sparkles className="h-4 w-4 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h1 className="font-semibold text-sm truncate">Multi-Model Chat</h1>
-                  <p className="text-[10px] text-muted-foreground">AI Assistant</p>
+            <div className="flex flex-col h-full">
+              {/* Header */}
+              <div className="p-4 pb-3 space-y-4">
+                {/* Logo */}
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-primary flex items-center justify-center shadow-md shadow-primary/20 flex-shrink-0">
+                    <Sparkles className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h1 className="font-semibold text-sm truncate">Multi-Model Chat</h1>
+                    <p className="text-[10px] text-muted-foreground">AI Assistant</p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Tab Switcher */}
-            <div className="flex mx-4 p-1 bg-muted/50 rounded-xl flex-shrink-0">
+              {/* Tab Switcher */}
+              <div className="flex mx-4 p-1 bg-muted/50 rounded-xl">
               <button
                 onClick={() => setSidebarTab("chats")}
                 className={cn(
@@ -416,8 +417,8 @@ export function Sidebar({ isOpen }: SidebarProps) {
               </button>
             </div>
 
-            {/* Tab Content */}
-            <div className="flex-1 flex flex-col min-h-0 overflow-hidden mt-3">
+              {/* Tab Content */}
+              <div className="flex-1 flex flex-col min-h-0 overflow-hidden mt-3">
               {/* Chats Tab Content */}
               {sidebarTab === "chats" && (
                 <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -756,30 +757,31 @@ export function Sidebar({ isOpen }: SidebarProps) {
               )}
             </div>
 
-            {/* Footer */}
-            <div className="p-3 border-t border-border/50 bg-card/30 flex-shrink-0">
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                  className="h-9 w-9 rounded-xl flex-shrink-0"
-                  title={theme === "dark" ? "Light mode" : "Dark mode"}
-                >
-                  {theme === "dark" ? (
-                    <Sun className="h-4 w-4" />
-                  ) : (
-                    <Moon className="h-4 w-4" />
-                  )}
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="flex-1 justify-start gap-2 h-9 rounded-xl"
-                  onClick={() => setSettingsOpen(true)}
-                >
-                  <Settings className="h-4 w-4" />
-                  <span className="text-sm">Settings</span>
-                </Button>
+              {/* Footer */}
+              <div className="p-3 border-t border-border/50 bg-card/30">
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                    className="h-9 w-9 rounded-xl flex-shrink-0"
+                    title={theme === "dark" ? "Light mode" : "Dark mode"}
+                  >
+                    {theme === "dark" ? (
+                      <Sun className="h-4 w-4" />
+                    ) : (
+                      <Moon className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="flex-1 justify-start gap-2 h-9 rounded-xl"
+                    onClick={() => setSettingsOpen(true)}
+                  >
+                    <Settings className="h-4 w-4" />
+                    <span className="text-sm">Settings</span>
+                  </Button>
+                </div>
               </div>
             </div>
           </motion.aside>
