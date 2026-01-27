@@ -512,7 +512,7 @@ export function ChatWindow() {
                 <div className="w-7 h-7 rounded-lg bg-gradient-primary flex items-center justify-center shadow-sm">
                   <Sparkles className="h-3.5 w-3.5 text-white" />
                 </div>
-                <span className="font-semibold text-sm hidden lg:block">Multi-Model Chat</span>
+                <span className="font-semibold text-sm hidden lg:block">OmniChat</span>
               </motion.div>
             )}
           </AnimatePresence>

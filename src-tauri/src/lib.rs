@@ -46,6 +46,8 @@ pub fn run() {
             commands::knowledge::delete_file,
             commands::knowledge::get_bucket_files,
             commands::knowledge::search_bucket,
+            commands::license::activate_license,
+            commands::license::deactivate_license,
         ])
         .setup(|app| {
             // Initialize the database

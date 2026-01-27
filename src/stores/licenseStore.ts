@@ -1,6 +1,13 @@
 import { create } from "zustand";
+import { invoke } from "@tauri-apps/api/core";
 
 type LicenseStatus = "inactive" | "checking" | "active" | "unverified" | "error";
+
+interface LicenseResult {
+  success: boolean;
+  message: string;
+  instance_id: string | null;
+}
 
 interface LicenseState {
   licenseKey: string;
@@ -9,8 +16,10 @@ interface LicenseState {
   lastChecked: string | null;
   installedAt: string;
   graceDays: number;
+  instanceId: string | null;
   loadLicense: () => void;
   activateLicense: (key: string) => Promise<void>;
+  deactivateLicense: () => Promise<void>;
   clearLicense: () => void;
   getGraceDaysRemaining: () => number;
   isWithinGrace: () => boolean;
@@ -18,6 +27,7 @@ interface LicenseState {
 }
 
 const LICENSE_KEY_STORAGE = "license_key";
+const LICENSE_INSTANCE_ID_STORAGE = "license_instance_id";
 const LICENSE_INSTALL_ID = "license_install_id";
 const LICENSE_STATUS_STORAGE = "license_status";
 const LICENSE_MESSAGE_STORAGE = "license_message";
@@ -34,10 +44,16 @@ const getInstalledAt = (): string => {
 };
 
 const getGraceDaysRemaining = (installedAt: string): number => {
-  const installedTime = new Date(installedAt).getTime();
-  const now = Date.now();
+  const installed = new Date(installedAt);
+  const now = new Date();
+  
+  // Compare calendar days, not 24-hour periods
+  const installedDay = new Date(installed.getFullYear(), installed.getMonth(), installed.getDate());
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
   const msPerDay = 1000 * 60 * 60 * 24;
-  const daysSince = Math.floor((now - installedTime) / msPerDay);
+  const daysSince = Math.round((today.getTime() - installedDay.getTime()) / msPerDay);
+  
   return Math.max(0, GRACE_DAYS - daysSince);
 };
 
@@ -49,9 +65,10 @@ const getInstallId = (): string => {
   return id;
 };
 
-const getVerifyUrl = (): string | undefined => {
-  const url = import.meta.env.VITE_LICENSE_VERIFY_URL as string | undefined;
-  return url?.trim() ? url : undefined;
+const getInstanceName = (): string => {
+  // Create a unique instance name based on install ID
+  const installId = getInstallId();
+  return `OmniChat-${installId.slice(0, 8)}`;
 };
 
 export const useLicenseStore = create<LicenseState>((set, get) => ({
@@ -61,14 +78,16 @@ export const useLicenseStore = create<LicenseState>((set, get) => ({
   lastChecked: null,
   installedAt: getInstalledAt(),
   graceDays: GRACE_DAYS,
+  instanceId: null,
 
   loadLicense: () => {
     const licenseKey = localStorage.getItem(LICENSE_KEY_STORAGE) || "";
     const status = (localStorage.getItem(LICENSE_STATUS_STORAGE) as LicenseStatus) || "inactive";
     const message = localStorage.getItem(LICENSE_MESSAGE_STORAGE) || "";
     const lastChecked = localStorage.getItem(LICENSE_LAST_CHECKED_STORAGE);
+    const instanceId = localStorage.getItem(LICENSE_INSTANCE_ID_STORAGE);
     const installedAt = getInstalledAt();
-    set({ licenseKey, status, message, lastChecked, installedAt });
+    set({ licenseKey, status, message, lastChecked, installedAt, instanceId });
   },
 
   activateLicense: async (key: string) => {
@@ -77,64 +96,43 @@ export const useLicenseStore = create<LicenseState>((set, get) => ({
 
     set({ status: "checking", message: "Verifying license..." });
 
-    const verifyUrl = getVerifyUrl();
-    const installId = getInstallId();
+    const instanceName = getInstanceName();
     const now = new Date().toISOString();
 
-    if (!verifyUrl) {
-      localStorage.setItem(LICENSE_KEY_STORAGE, trimmed);
-      localStorage.setItem(LICENSE_STATUS_STORAGE, "unverified");
-      localStorage.setItem(
-        LICENSE_MESSAGE_STORAGE,
-        "Saved locally. Set VITE_LICENSE_VERIFY_URL to enable verification."
-      );
-      localStorage.setItem(LICENSE_LAST_CHECKED_STORAGE, now);
-      set({
-        licenseKey: trimmed,
-        status: "unverified",
-        message: "Saved locally. Set VITE_LICENSE_VERIFY_URL to enable verification.",
-        lastChecked: now,
-      });
-      return;
-    }
-
     try {
-      const response = await fetch(verifyUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          license_key: trimmed,
-          install_id: installId,
-        }),
+      const result = await invoke<LicenseResult>("activate_license", {
+        licenseKey: trimmed,
+        instanceName,
       });
-
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || data.valid === false) {
-        const errorMessage = data.message || "Invalid license key.";
+      
+      if (result.success) {
+        localStorage.setItem(LICENSE_KEY_STORAGE, trimmed);
+        localStorage.setItem(LICENSE_STATUS_STORAGE, "active");
+        localStorage.setItem(LICENSE_MESSAGE_STORAGE, result.message);
+        localStorage.setItem(LICENSE_LAST_CHECKED_STORAGE, now);
+        if (result.instance_id) {
+          localStorage.setItem(LICENSE_INSTANCE_ID_STORAGE, result.instance_id);
+        }
+        
+        set({
+          licenseKey: trimmed,
+          status: "active",
+          message: result.message,
+          lastChecked: now,
+          instanceId: result.instance_id,
+        });
+      } else {
         localStorage.setItem(LICENSE_STATUS_STORAGE, "error");
-        localStorage.setItem(LICENSE_MESSAGE_STORAGE, errorMessage);
+        localStorage.setItem(LICENSE_MESSAGE_STORAGE, result.message);
         localStorage.setItem(LICENSE_LAST_CHECKED_STORAGE, now);
         set({
           status: "error",
-          message: errorMessage,
+          message: result.message,
           lastChecked: now,
         });
-        return;
       }
-
-      const successMessage = data.message || "License verified.";
-      localStorage.setItem(LICENSE_KEY_STORAGE, trimmed);
-      localStorage.setItem(LICENSE_STATUS_STORAGE, "active");
-      localStorage.setItem(LICENSE_MESSAGE_STORAGE, successMessage);
-      localStorage.setItem(LICENSE_LAST_CHECKED_STORAGE, now);
-      set({
-        licenseKey: trimmed,
-        status: "active",
-        message: successMessage,
-        lastChecked: now,
-      });
     } catch (error) {
-      const errorMessage = "License verification failed. Check your connection.";
+      const errorMessage = `License verification failed: ${error}`;
       localStorage.setItem(LICENSE_STATUS_STORAGE, "error");
       localStorage.setItem(LICENSE_MESSAGE_STORAGE, errorMessage);
       localStorage.setItem(LICENSE_LAST_CHECKED_STORAGE, now);
@@ -146,12 +144,57 @@ export const useLicenseStore = create<LicenseState>((set, get) => ({
     }
   },
 
+  deactivateLicense: async () => {
+    const { licenseKey, instanceId } = get();
+    if (!licenseKey || !instanceId) return;
+
+    set({ status: "checking", message: "Deactivating license..." });
+    const now = new Date().toISOString();
+
+    try {
+      const result = await invoke<LicenseResult>("deactivate_license", {
+        licenseKey,
+        instanceId,
+      });
+      
+      if (result.success) {
+        // Clear all license data
+        localStorage.removeItem(LICENSE_KEY_STORAGE);
+        localStorage.removeItem(LICENSE_INSTANCE_ID_STORAGE);
+        localStorage.removeItem(LICENSE_STATUS_STORAGE);
+        localStorage.removeItem(LICENSE_MESSAGE_STORAGE);
+        localStorage.removeItem(LICENSE_LAST_CHECKED_STORAGE);
+        
+        set({
+          licenseKey: "",
+          status: "inactive",
+          message: result.message,
+          lastChecked: now,
+          instanceId: null,
+        });
+      } else {
+        set({
+          status: "error",
+          message: result.message,
+          lastChecked: now,
+        });
+      }
+    } catch (error) {
+      set({
+        status: "error",
+        message: `Failed to deactivate license: ${error}`,
+        lastChecked: now,
+      });
+    }
+  },
+
   clearLicense: () => {
     localStorage.removeItem(LICENSE_KEY_STORAGE);
+    localStorage.removeItem(LICENSE_INSTANCE_ID_STORAGE);
     localStorage.removeItem(LICENSE_STATUS_STORAGE);
     localStorage.removeItem(LICENSE_MESSAGE_STORAGE);
     localStorage.removeItem(LICENSE_LAST_CHECKED_STORAGE);
-    set({ licenseKey: "", status: "inactive", message: "", lastChecked: null });
+    set({ licenseKey: "", status: "inactive", message: "", lastChecked: null, instanceId: null });
   },
 
   getGraceDaysRemaining: () => {

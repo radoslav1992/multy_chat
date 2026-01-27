@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
-import { BookOpen, Check, Plus, ChevronDown, Upload, Loader2, AlertCircle, Trash2 } from "lucide-react";
+import { BookOpen, Check, Plus, Upload, Loader2, AlertCircle, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useKnowledgeStore, Bucket } from "@/stores/knowledgeStore";
 import { useChatStore } from "@/stores/chatStore";

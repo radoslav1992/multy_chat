@@ -27,7 +27,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { ScrollArea } from "@/components/ui/ScrollArea";
-import { useAppStore, SidebarTab } from "@/stores/appStore";
+import { useAppStore } from "@/stores/appStore";
 import { useChatStore, ConversationSearchResult } from "@/stores/chatStore";
 import { useKnowledgeStore, Bucket } from "@/stores/knowledgeStore";
 import { cn, formatDate, truncateText, formatFileSize } from "@/lib/utils";
@@ -377,7 +377,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
                     <Sparkles className="h-4 w-4 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h1 className="font-semibold text-sm truncate">Multi-Model Chat</h1>
+                    <h1 className="font-semibold text-sm truncate">OmniChat</h1>
                     <p className="text-[10px] text-muted-foreground">AI Assistant</p>
                   </div>
                 </div>
@@ -705,7 +705,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
 
                   {/* Buckets List - Scrollable */}
                   <ScrollArea className="flex-1 mt-3">
-                    <div className="px-2 space-y-2 pb-4">
+                    <div className="px-2 space-y-2 pb-4" style={{ maxWidth: '100%', overflow: 'hidden' }}>
                       {isLoadingBuckets && buckets.length === 0 ? (
                         <div className="flex items-center justify-center py-12">
                           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -870,7 +870,7 @@ function BucketItem({
   return (
     <div
       className={cn(
-        "rounded-xl border transition-all",
+        "rounded-xl border transition-all overflow-hidden",
         isSelected
           ? "border-primary/50 bg-primary/5"
           : "border-border bg-card hover:bg-accent/30"
@@ -927,9 +927,9 @@ function BucketItem({
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="px-3 pb-3 space-y-2">
+            <div className="pl-10 pr-3 pb-3 space-y-2" style={{ maxWidth: '100%', boxSizing: 'border-box' }}>
               {bucket.description && (
-                <p className="text-xs text-muted-foreground pl-7">
+                <p className="text-xs text-muted-foreground">
                   {bucket.description}
                 </p>
               )}
@@ -938,8 +938,7 @@ function BucketItem({
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full justify-center gap-2 rounded-lg ml-7"
-                style={{ width: "calc(100% - 28px)" }}
+                className="w-full justify-center gap-2 rounded-lg"
                 onClick={onUpload}
                 disabled={isUploading}
               >
@@ -953,23 +952,24 @@ function BucketItem({
 
               {/* Files List */}
               {files.length > 0 && (
-                <div className="space-y-1.5 pl-7">
+                <div className="space-y-1.5">
                   {files.map((file) => (
                     <div
                       key={file.id}
                       className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 text-xs"
+                      style={{ maxWidth: '100%', overflow: 'hidden' }}
                     >
                       <File className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 overflow-hidden">
                         <p className="truncate font-medium">{file.filename}</p>
-                        <p className="text-muted-foreground">
+                        <p className="text-muted-foreground truncate">
                           {formatFileSize(file.file_size)} • {file.chunk_count} chunks
                         </p>
                       </div>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                        className="h-6 w-6 flex-shrink-0 text-muted-foreground hover:text-destructive"
                         onClick={() => onDeleteFile(file.id, file.filename)}
                       >
                         <X className="h-3 w-3" />

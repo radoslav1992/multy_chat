@@ -35,6 +35,7 @@ export function SettingsDialog() {
     lastChecked,
     loadLicense,
     activateLicense,
+    deactivateLicense,
     clearLicense,
   } = useLicenseStore();
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
@@ -42,12 +43,13 @@ export function SettingsDialog() {
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [showLicenseKey, setShowLicenseKey] = useState(false);
   const [licenseInput, setLicenseInput] = useState("");
+  const [isDeactivating, setIsDeactivating] = useState(false);
   const [whisperForm, setWhisperForm] = useState(whisperConfig);
   const [whisperSaving, setWhisperSaving] = useState(false);
   const [whisperDownloading, setWhisperDownloading] = useState<string | null>(null);
   const [whisperDownloadError, setWhisperDownloadError] = useState("");
-  const [defaultWhisperModelPath, setDefaultWhisperModelPath] = useState("");
-  const [fastWhisperModelPath, setFastWhisperModelPath] = useState("");
+  const [_defaultWhisperModelPath, setDefaultWhisperModelPath] = useState("");
+  const [_fastWhisperModelPath, setFastWhisperModelPath] = useState("");
   const [storedWhisperModelId, setStoredWhisperModelId] = useState<string | null>(null);
   const [isChangingModel, setIsChangingModel] = useState(false);
 
@@ -505,8 +507,9 @@ export function SettingsDialog() {
                 License
               </h3>
               <p className="text-xs text-muted-foreground mb-4">
-                Activate your one-time license key. This unlocks the app on this
-                device.
+                {licenseStatus === "active" 
+                  ? "Your license is active on this device."
+                  : "Activate your one-time license key. This unlocks the app on this device."}
               </p>
 
               <div className="p-4 rounded-lg border border-border bg-card space-y-3">
@@ -525,50 +528,86 @@ export function SettingsDialog() {
                   <p className="text-xs text-muted-foreground">{licenseMessage}</p>
                 )}
 
-                <div className="flex items-center gap-2">
-                  <Input
-                    type={showLicenseKey ? "text" : "password"}
-                    placeholder="Enter license key"
-                    value={licenseInput}
-                    onChange={(e) => setLicenseInput(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setShowLicenseKey((prev) => !prev)}
-                  >
-                    {showLicenseKey ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
+                {licenseStatus !== "active" && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type={showLicenseKey ? "text" : "password"}
+                        placeholder="Enter license key"
+                        value={licenseInput}
+                        onChange={(e) => setLicenseInput(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowLicenseKey((prev) => !prev)}
+                      >
+                        {showLicenseKey ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
 
-                {licenseKey && (
-                  <div className="text-xs text-muted-foreground">
-                    Saved key: {showLicenseKey ? licenseKey : maskKey(licenseKey)}
-                  </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={() => activateLicense(licenseInput)}
+                        disabled={!licenseInput.trim() || licenseStatus === "checking"}
+                        size="sm"
+                      >
+                        {licenseStatus === "checking" ? "Verifying..." : "Activate"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearLicense}
+                        disabled={!licenseInput.trim()}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                  </>
                 )}
 
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => activateLicense(licenseInput)}
-                    disabled={!licenseInput.trim() || licenseStatus === "checking"}
-                    size="sm"
-                  >
-                    {licenseStatus === "checking" ? "Verifying..." : "Activate"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearLicense}
-                    disabled={!licenseKey}
-                  >
-                    Clear
-                  </Button>
-                </div>
+                {licenseStatus === "active" && licenseKey && (
+                  <>
+                    <div className="text-xs text-muted-foreground">
+                      License key: {showLicenseKey ? licenseKey : maskKey(licenseKey)}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 ml-2"
+                        onClick={() => setShowLicenseKey((prev) => !prev)}
+                      >
+                        {showLicenseKey ? (
+                          <EyeOff className="h-3 w-3" />
+                        ) : (
+                          <Eye className="h-3 w-3" />
+                        )}
+                      </Button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          setIsDeactivating(true);
+                          await deactivateLicense();
+                          setIsDeactivating(false);
+                        }}
+                        disabled={isDeactivating}
+                      >
+                        {isDeactivating ? "Processing..." : "Deactivate"}
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        Deactivate to move your license to another device
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -577,7 +616,7 @@ export function SettingsDialog() {
                 About
               </h3>
               <p className="text-xs text-muted-foreground">
-                Multi-Model Chat v0.1.0
+                OmniChat v0.1.0
                 <br />A modern AI chat application supporting multiple providers.
               </p>
             </div>

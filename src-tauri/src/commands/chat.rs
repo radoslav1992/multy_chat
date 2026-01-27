@@ -665,7 +665,7 @@ pub async fn export_conversation_markdown(
             output.push_str("\n\n");
         }
     }
-    output.push_str("*Exported from Multi-Model Chat*\n\n");
+    output.push_str("*Exported from OmniChat*\n\n");
 
     for message in messages {
         let heading = match message.role.as_str() {

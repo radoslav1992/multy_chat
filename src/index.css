@@ -297,3 +297,10 @@ body > .mermaid-error,
 .input-glow:focus-within {
   @apply ring-2 ring-primary/20 border-primary/50;
 }
+
+/* Fix Radix ScrollArea viewport width issue */
+[data-radix-scroll-area-viewport] > div {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}

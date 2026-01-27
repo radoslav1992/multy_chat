@@ -1,5 +1,5 @@
 [package]
-name = "multi-model-chat"
+name = "omnichat"
 version = "0.1.0"
 description = "A modern multi-model AI chat application"
 authors = ["you"]

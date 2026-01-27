@@ -13,7 +13,7 @@ import {
 import { useState } from "react";
 import { Message } from "@/stores/chatStore";
 import { MarkdownRenderer } from "@/components/preview/MarkdownRenderer";
-import { cn, getProviderColor, getProviderIcon } from "@/lib/utils";
+import { cn, getProviderIcon } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 
 interface MessageBubbleProps {

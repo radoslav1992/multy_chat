@@ -2798,34 +2798,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "multi-model-chat"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64 0.22.1",
- "chrono",
- "fastembed",
- "futures",
- "hound",
- "pdf-extract",
- "reqwest",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-fs",
- "tauri-plugin-http",
- "tauri-plugin-store",
- "thiserror 2.0.18",
- "tokio",
- "uuid",
- "whisper-rs",
- "zip",
-]
-
-[[package]]
 name = "native-tls"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3227,6 +3199,34 @@ dependencies = [
  "objc2-foundation",
  "objc2-javascript-core",
  "objc2-security",
+]
+
+[[package]]
+name = "omnichat"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.22.1",
+ "chrono",
+ "fastembed",
+ "futures",
+ "hound",
+ "pdf-extract",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-fs",
+ "tauri-plugin-http",
+ "tauri-plugin-store",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+ "whisper-rs",
+ "zip",
 ]
 
 [[package]]
