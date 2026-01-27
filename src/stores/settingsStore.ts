@@ -9,14 +9,24 @@ interface ApiKeys {
   deepseek: string;
 }
 
+interface WhisperConfig {
+  binaryPath: string;
+  modelPath: string;
+  language: string;
+}
+
 interface SettingsState {
   apiKeys: ApiKeys;
+  whisperConfig: WhisperConfig;
   isLoading: boolean;
   loadApiKey: (provider: Provider) => Promise<string | null>;
   setApiKey: (provider: Provider, apiKey: string) => Promise<void>;
   deleteApiKey: (provider: Provider) => Promise<void>;
   loadAllApiKeys: () => Promise<void>;
   getApiKey: (provider: Provider) => string;
+  loadWhisperConfig: () => Promise<void>;
+  setWhisperConfig: (config: WhisperConfig) => Promise<void>;
+  downloadWhisperModel: (modelId: string) => Promise<string>;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -25,6 +35,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     openai: "",
     gemini: "",
     deepseek: "",
+  },
+  whisperConfig: {
+    binaryPath: "",
+    modelPath: "",
+    language: "en",
   },
   isLoading: false,
 
@@ -76,5 +91,38 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   getApiKey: (provider: Provider) => {
     return get().apiKeys[provider];
+  },
+
+  loadWhisperConfig: async () => {
+    try {
+      const config = await invoke<WhisperConfig>("ensure_default_whisper_config");
+      set({ whisperConfig: config });
+    } catch (error) {
+      console.error("Failed to load whisper config:", error);
+    }
+  },
+
+  setWhisperConfig: async (config: WhisperConfig) => {
+    try {
+      await invoke("set_whisper_config", {
+        binaryPath: config.binaryPath,
+        modelPath: config.modelPath,
+        language: config.language,
+      });
+      set({ whisperConfig: config });
+    } catch (error) {
+      console.error("Failed to save whisper config:", error);
+      throw error;
+    }
+  },
+
+  downloadWhisperModel: async (modelId: string) => {
+    try {
+      const path = await invoke<string>("download_whisper_model", { modelId });
+      return path;
+    } catch (error) {
+      console.error("Failed to download whisper model:", error);
+      throw error;
+    }
   },
 }));

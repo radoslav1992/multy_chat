@@ -1,5 +1,5 @@
 {
-  "name": "multi-model-chat",
+  "name": "omnichat",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -24,6 +24,7 @@
     "@radix-ui/react-tooltip": "^1.1.6",
     "@tauri-apps/api": "^2.2.0",
     "@tauri-apps/plugin-dialog": "^2.2.0",
+    "@tauri-apps/plugin-fs": "^2.4.5",
     "@tauri-apps/plugin-store": "^2.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

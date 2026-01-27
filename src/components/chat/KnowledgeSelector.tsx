@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
-import { BookOpen, Check, Plus, ChevronDown, Upload, Loader2, AlertCircle, Trash2 } from "lucide-react";
+import { BookOpen, Check, Plus, Upload, Loader2, AlertCircle, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useKnowledgeStore, Bucket } from "@/stores/knowledgeStore";
 import { useChatStore } from "@/stores/chatStore";
@@ -99,20 +99,24 @@ export function KnowledgeSelector() {
       <Popover.Trigger asChild>
         <button
           className={cn(
-            "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap",
-            "border hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring",
+            "inline-flex items-center gap-2 h-9 px-3 rounded-xl text-sm font-medium transition-all whitespace-nowrap",
+            "hover:bg-muted focus:outline-none",
             selectedCount > 0
-              ? "border-primary bg-primary/10 text-primary"
-              : "border-border"
+              ? "bg-primary/10 text-primary"
+              : "text-muted-foreground hover:text-foreground"
           )}
         >
-          <BookOpen className="h-4 w-4 flex-shrink-0" />
-          <span>
+          <BookOpen className="h-[18px] w-[18px] flex-shrink-0" />
+          <span className="hidden sm:inline">
             {selectedCount > 0
-              ? `${selectedCount} Bucket${selectedCount === 1 ? "" : "s"}`
+              ? `${selectedCount} source${selectedCount === 1 ? "" : "s"}`
               : "Knowledge"}
           </span>
-          <ChevronDown className="h-4 w-4 opacity-50 flex-shrink-0" />
+          {selectedCount > 0 && (
+            <span className="sm:hidden w-5 h-5 rounded-md bg-primary text-primary-foreground text-xs flex items-center justify-center font-semibold">
+              {selectedCount}
+            </span>
+          )}
         </button>
       </Popover.Trigger>
 
