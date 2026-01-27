@@ -51,10 +51,12 @@ const FALLBACK_CONFIG: ModelsConfig = {
     gemini: {
       name: "Google Gemini",
       models: [
-        { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
-        { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" },
+        { id: "gemini-3-flash-preview", name: "Gemini 3 Flash" },
+        { id: "gemini-3-pro-preview", name: "Gemini 3 Pro" },
+        { id: "gemini-2.5-flash-preview-05-20", name: "Gemini 2.5 Flash" },
+        { id: "gemini-2.5-pro-preview-05-06", name: "Gemini 2.5 Pro" },
       ],
-      default: "gemini-2.5-flash",
+      default: "gemini-3-flash-preview",
     },
     deepseek: {
       name: "DeepSeek",
@@ -113,9 +115,22 @@ async function fetchConfig(url: string): Promise<ModelsConfig | null> {
   }
 }
 
+export function clearModelsCache(): void {
+  try {
+    localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(CACHE_EXPIRY_KEY);
+    console.log("[ModelsService] Cache cleared");
+  } catch (e) {
+    console.warn("[ModelsService] Failed to clear cache:", e);
+  }
+}
+
 export async function loadModelsConfig(forceRefresh = false): Promise<ModelsConfig> {
-  // Check cache first (unless force refresh)
-  if (!forceRefresh) {
+  // Clear cache if force refresh
+  if (forceRefresh) {
+    clearModelsCache();
+  } else {
+    // Check cache first
     const cached = getCachedConfig();
     if (cached) {
       console.log("[ModelsService] Using cached config, version:", cached.version);
@@ -123,13 +138,14 @@ export async function loadModelsConfig(forceRefresh = false): Promise<ModelsConf
     }
   }
 
-  // Try local config first (faster, works in dev)
-  let config = await fetchConfig(LOCAL_CONFIG_URL);
+  // Try remote config first (source of truth) with cache busting
+  const cacheBuster = `?t=${Date.now()}`;
+  let config = await fetchConfig(REMOTE_CONFIG_URL + cacheBuster);
   
-  // If local fails, try remote
+  // If remote fails, try local
   if (!config) {
-    console.log("[ModelsService] Local config not found, trying remote...");
-    config = await fetchConfig(REMOTE_CONFIG_URL);
+    console.log("[ModelsService] Remote config not found, trying local...");
+    config = await fetchConfig(LOCAL_CONFIG_URL + cacheBuster);
   }
 
   // If both fail, use fallback

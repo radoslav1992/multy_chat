@@ -12,6 +12,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
             commands::chat::send_message,
+            commands::chat::send_message_stream,
             commands::chat::regenerate_last_assistant,
             commands::chat::compare_response,
             commands::chat::get_conversations,
@@ -29,6 +30,15 @@ pub fn run() {
             commands::settings::get_api_key,
             commands::settings::set_api_key,
             commands::settings::delete_api_key,
+            commands::settings::get_whisper_config,
+            commands::settings::get_default_whisper_model_path,
+            commands::settings::get_whisper_model_path,
+            commands::settings::get_whisper_model_id,
+            commands::settings::set_whisper_model_id,
+            commands::settings::ensure_default_whisper_config,
+            commands::settings::set_whisper_config,
+            commands::speech::transcribe_audio,
+            commands::speech::download_whisper_model,
             commands::knowledge::create_bucket,
             commands::knowledge::delete_bucket,
             commands::knowledge::get_buckets,

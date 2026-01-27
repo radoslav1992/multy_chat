@@ -6,6 +6,7 @@ mod deepseek;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use anyhow::Result;
+use tokio::sync::mpsc;
 
 pub use anthropic::AnthropicProvider;
 pub use openai::OpenAIProvider;
@@ -26,9 +27,22 @@ pub struct ModelInfo {
     pub max_tokens: u32,
 }
 
+/// Chunk sent during streaming
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamChunk {
+    pub delta: String,
+    pub done: bool,
+}
+
 #[async_trait]
 pub trait Provider: Send + Sync {
     async fn chat(&self, messages: Vec<Message>, model: &str) -> Result<String>;
+    async fn chat_stream(
+        &self,
+        messages: Vec<Message>,
+        model: &str,
+        tx: mpsc::Sender<StreamChunk>,
+    ) -> Result<()>;
     fn list_models(&self) -> Vec<ModelInfo>;
 }
 

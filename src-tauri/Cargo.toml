@@ -29,9 +29,11 @@ thiserror = "2"
 anyhow = "1"
 async-trait = "0.1"
 base64 = "0.22"
-lopdf = "0.34"
+pdf-extract = "0.7"
 zip = "2"
 fastembed = "4"
+hound = "3.5.1"
+whisper-rs = "0.15.1"
 
 [features]
 default = ["custom-protocol"]

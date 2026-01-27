@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { save } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 import { ScrollArea } from "@/components/ui/ScrollArea";
 import { MessageBubble } from "./MessageBubble";
 import { InputArea } from "./InputArea";
@@ -30,17 +31,23 @@ import { Message, useChatStore, Provider } from "@/stores/chatStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useKnowledgeStore } from "@/stores/knowledgeStore";
 import { useAppStore } from "@/stores/appStore";
+import { useLicenseStore } from "@/stores/licenseStore";
 
 export function ChatWindow() {
   const {
     messages,
     currentConversationId,
     isLoading,
+    isStreaming,
+    streamingMessageId,
+    streamingContent,
     error,
     selectedProvider,
     selectedModel,
     selectedBucketIds,
-    sendMessage,
+    sendMessageStream,
+    setupStreamListeners,
+    stopStreaming,
     regenerateLastResponse,
     compareResponse,
     updateMessageContent,
@@ -53,13 +60,18 @@ export function ChatWindow() {
     clearError,
   } = useChatStore();
   
-  const { getApiKey, loadAllApiKeys } = useSettingsStore();
+  const { getApiKey, loadAllApiKeys, whisperConfig, loadWhisperConfig } = useSettingsStore();
   const { searchMultipleBuckets } = useKnowledgeStore();
   const { setSettingsOpen, sidebarOpen, toggleSidebar, knowledgeSidebarOpen, toggleKnowledgeSidebar } = useAppStore();
+  const {
+    status: licenseStatus,
+    loadLicense,
+    getGraceDaysRemaining,
+    requiresActivation,
+  } = useLicenseStore();
   const { toast } = useToast();
   
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const lastStreamedIdRef = useRef<string | null>(null);
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState("");
@@ -67,8 +79,6 @@ export function ChatWindow() {
   const [folderInput, setFolderInput] = useState("");
   const [folderPopoverOpen, setFolderPopoverOpen] = useState(false);
   const [compareView, setCompareView] = useState(false);
-  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
-  const [isStreaming, setIsStreaming] = useState(false);
 
   const currentConversation = conversations.find(
     (conversation) => conversation.id === currentConversationId
@@ -88,16 +98,42 @@ export function ChatWindow() {
   }, [loadAllApiKeys]);
 
   useEffect(() => {
-    // Scroll to bottom when messages change
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    loadWhisperConfig();
+  }, [loadWhisperConfig]);
+
+  useEffect(() => {
+    loadLicense();
+  }, [loadLicense]);
+
+  // Set up streaming listeners on mount - only once
+  useEffect(() => {
+    let unlisteners: (() => void)[] = [];
+    let mounted = true;
+    
+    setupStreamListeners().then((fns) => {
+      if (mounted) {
+        unlisteners = fns;
+      } else {
+        // Cleanup if component unmounted before promise resolved
+        fns.forEach((fn) => fn());
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unlisteners.forEach((fn) => fn());
+    };
+  }, []); // Empty dependency array - setup only once
+
+  useEffect(() => {
+    // Scroll to bottom when messages change or streaming content updates
+    if (scrollViewportRef.current) {
+      scrollViewportRef.current.scrollTop = scrollViewportRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, streamingContent, isStreaming]);
 
   useEffect(() => {
     setEditingMessageId(null);
-    setIsStreaming(false);
-    setStreamingMessageId(null);
   }, [currentConversationId]);
 
   useEffect(() => {
@@ -111,18 +147,6 @@ export function ChatWindow() {
       setFolderInput("");
     }
   }, [folderPopoverOpen]);
-
-  useEffect(() => {
-    if (!messages.length) return;
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage.role !== "assistant") return;
-
-    if (lastStreamedIdRef.current === lastMessage.id) return;
-
-    lastStreamedIdRef.current = lastMessage.id;
-    setStreamingMessageId(lastMessage.id);
-    setIsStreaming(true);
-  }, [messages]);
 
   const trimSnippet = (content: string, maxLength = 400) => {
     if (content.length <= maxLength) return content;
@@ -163,6 +187,16 @@ export function ChatWindow() {
   const handleSend = async () => {
     const trimmed = input.trim();
     if (!trimmed) return;
+
+    if (requiresActivation()) {
+      toast({
+        title: "License required",
+        description: "Please activate your license to continue.",
+        variant: "destructive",
+      });
+      setSettingsOpen(true);
+      return;
+    }
 
     if (editingMessageId) {
       const lastAssistant = [...messages]
@@ -207,10 +241,21 @@ export function ChatWindow() {
     const messageContent = trimmed;
     setInput("");
 
-    await sendMessage(messageContent, apiKey, context, sources);
+    // Use streaming for sending messages
+    await sendMessageStream(messageContent, apiKey, context, sources);
   };
 
   const handleRegenerate = async () => {
+    if (requiresActivation()) {
+      toast({
+        title: "License required",
+        description: "Please activate your license to continue.",
+        variant: "destructive",
+      });
+      setSettingsOpen(true);
+      return;
+    }
+
     const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
 
@@ -236,6 +281,16 @@ export function ChatWindow() {
   };
 
   const handleCompare = async () => {
+    if (requiresActivation()) {
+      toast({
+        title: "License required",
+        description: "Please activate your license to continue.",
+        variant: "destructive",
+      });
+      setSettingsOpen(true);
+      return;
+    }
+
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
 
     if (!lastUser) {
@@ -256,6 +311,32 @@ export function ChatWindow() {
     const { context, sources } = await buildContext(lastUser.content);
 
     await compareResponse(apiKey, selectedProvider, selectedModel, context, sources);
+  };
+
+  const handleTranscribe = async (wavBase64: string) => {
+    if (requiresActivation()) {
+      toast({
+        title: "License required",
+        description: "Please activate your license to continue.",
+        variant: "destructive",
+      });
+      setSettingsOpen(true);
+      return;
+    }
+
+    try {
+      const transcript = await invoke<string>("transcribe_audio", { wavBase64 });
+      const cleaned = transcript.trim();
+      if (cleaned) {
+        setInput((prev) => (prev ? `${prev} ${cleaned}` : cleaned));
+      }
+    } catch (error) {
+      toast({
+        title: "Transcription failed",
+        description: String(error),
+        variant: "destructive",
+      });
+    }
   };
 
   const handleFork = async () => {
@@ -326,13 +407,7 @@ export function ChatWindow() {
   };
 
   const handleStopStreaming = () => {
-    setIsStreaming(false);
-    setStreamingMessageId(null);
-  };
-
-  const handleStreamComplete = () => {
-    setIsStreaming(false);
-    setStreamingMessageId(null);
+    stopStreaming();
   };
 
   const handleExport = async () => {
@@ -366,6 +441,14 @@ export function ChatWindow() {
   };
 
   const hasApiKey = !!getApiKey(selectedProvider);
+  const graceDaysRemaining = getGraceDaysRemaining();
+  const licenseBlocked = requiresActivation();
+  const showLicenseBanner = licenseStatus !== "active";
+  const hasWhisperModel = !!whisperConfig.modelPath;
+  const speechEnabled = hasWhisperModel;
+  const speechDisabledReason = hasWhisperModel
+    ? "Whisper model is ready. Try recording again."
+    : "Preparing default Whisper model. Open settings if it doesn't appear.";
 
   const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
   const lastUserId = [...messages].reverse().find((m) => m.role === "user")?.id;
@@ -401,7 +484,7 @@ export function ChatWindow() {
   return (
     <div className="flex flex-col h-full">
       {/* Header with Model Selector */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50 backdrop-blur-sm gap-4 min-h-[60px]">
+      <header className="flex items-center px-4 py-3 border-b border-border bg-card/50 backdrop-blur-sm gap-2 min-h-[60px]">
         <div className="flex items-center gap-2 flex-shrink-0">
           <Button
             variant="ghost"
@@ -413,9 +496,9 @@ export function ChatWindow() {
             <PanelLeft className="h-5 w-5" />
           </Button>
           <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
-          <h1 className="font-semibold text-base whitespace-nowrap">Multi-Model Chat</h1>
+          <h1 className="font-semibold text-base whitespace-nowrap hidden md:block">Multi-Model Chat</h1>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1 flex-1 justify-end overflow-x-auto">
           <KnowledgeSelector />
           <ModelSelector />
           <Popover.Root open={folderPopoverOpen} onOpenChange={setFolderPopoverOpen}>
@@ -609,8 +692,30 @@ export function ChatWindow() {
         </div>
       </header>
 
+      {showLicenseBanner && (
+        <div className="border-b border-border bg-muted/30 px-4 py-2">
+          <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
+            <div className="text-xs text-muted-foreground">
+              {licenseBlocked ? (
+                <span className="text-destructive">
+                  License required to continue. Your grace period has ended.
+                </span>
+              ) : (
+                <span>
+                  Trial mode: {graceDaysRemaining} day
+                  {graceDaysRemaining === 1 ? "" : "s"} left before activation is required.
+                </span>
+              )}
+            </div>
+            <Button size="sm" onClick={() => setSettingsOpen(true)}>
+              Activate License
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Messages Area */}
-      <ScrollArea className="flex-1" ref={scrollRef}>
+      <ScrollArea className="flex-1" viewportRef={scrollViewportRef}>
         <div className="max-w-4xl mx-auto py-6 px-4">
           <AnimatePresence mode="popLayout">
             {messages.length === 0 ? (
@@ -684,9 +789,6 @@ export function ChatWindow() {
                             }
                             isStreaming={assistant.id === streamingId}
                             onStopStreaming={assistant.id === streamingId ? handleStopStreaming : undefined}
-                            onStreamComplete={
-                              assistant.id === streamingId ? handleStreamComplete : undefined
-                            }
                             fullWidth
                           />
                         ))}
@@ -711,7 +813,6 @@ export function ChatWindow() {
                   }
                   isStreaming={message.id === streamingId}
                   onStopStreaming={message.id === streamingId ? handleStopStreaming : undefined}
-                  onStreamComplete={message.id === streamingId ? handleStreamComplete : undefined}
                 />
               ))
             )}
@@ -775,13 +876,19 @@ export function ChatWindow() {
         value={input}
         onChange={setInput}
         onSend={handleSend}
-        disabled={isLoading || !hasApiKey}
+        disabled={isLoading || !hasApiKey || licenseBlocked}
         isStreaming={isStreaming}
         onStopStreaming={handleStopStreaming}
         isEditing={!!editingMessageId}
         onCancelEdit={editingMessageId ? handleCancelEdit : undefined}
+        speechEnabled={speechEnabled}
+        speechDisabledReason={speechDisabledReason}
+        onTranscribe={handleTranscribe}
+        onRequestSettings={() => setSettingsOpen(true)}
         placeholder={
-          hasApiKey
+          licenseBlocked
+            ? "Activate your license in settings to continue"
+            : hasApiKey
             ? editingMessageId
               ? "Edit your message..."
               : "Type your message..."

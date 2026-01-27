@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 use chrono::Utc;
+use tokio::sync::mpsc;
 
-use crate::providers::{Message as ProviderMessage, create_provider};
+use crate::providers::{Message as ProviderMessage, create_provider, StreamChunk};
 use crate::db;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -101,6 +102,22 @@ pub struct CompareResponse {
     pub conversation_id: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamingChunk {
+    pub message_id: String,
+    pub conversation_id: String,
+    pub delta: String,
+    pub done: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamStarted {
+    pub message_id: String,
+    pub conversation_id: String,
+    pub provider: String,
+    pub model: String,
+}
+
 #[tauri::command]
 pub async fn send_message(
     app: AppHandle,
@@ -185,6 +202,171 @@ pub async fn send_message(
     Ok(ChatResponse {
         message: assistant_message,
         conversation_id: request.conversation_id,
+    })
+}
+
+#[tauri::command]
+pub async fn send_message_stream(
+    app: AppHandle,
+    request: SendMessageRequest,
+) -> Result<StreamStarted, String> {
+    // Save user message to database
+    let user_message_id = Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+    
+    let user_message = Message {
+        id: user_message_id.clone(),
+        conversation_id: request.conversation_id.clone(),
+        role: "user".to_string(),
+        content: request.content.clone(),
+        provider: request.provider.clone(),
+        model: request.model.clone(),
+        created_at: now.clone(),
+        sources: None,
+    };
+    
+    db::save_message(&app, &user_message).await
+        .map_err(|e| format!("Failed to save user message: {}", e))?;
+
+    // Get conversation history
+    let messages = db::get_messages(&app, &request.conversation_id).await
+        .map_err(|e| format!("Failed to get messages: {}", e))?;
+
+    // Convert to provider format
+    let mut provider_messages: Vec<ProviderMessage> = messages
+        .iter()
+        .map(|m| ProviderMessage {
+            role: m.role.clone(),
+            content: m.content.clone(),
+        })
+        .collect();
+
+    // Add context if provided (from RAG)
+    if let Some(context) = &request.context {
+        if !context.is_empty() {
+            println!("[RAG] Adding knowledge context to streaming conversation ({} chars)", context.len());
+            provider_messages.insert(0, ProviderMessage {
+                role: "system".to_string(),
+                content: format!(
+                    "IMPORTANT: The user has provided documents in their knowledge base. \
+                    You MUST use the following context from their documents to answer their question. \
+                    Base your answer on this context - do not give generic advice. \
+                    If the context doesn't contain relevant information, say so.\n\n\
+                    === KNOWLEDGE BASE CONTEXT ===\n{}\n=== END CONTEXT ===",
+                    context
+                ),
+            });
+        }
+    }
+
+    // Create assistant message placeholder
+    let assistant_message_id = Uuid::new_v4().to_string();
+    let conversation_id = request.conversation_id.clone();
+    let provider_name = request.provider.clone();
+    let model_name = request.model.clone();
+    let sources = request.sources.clone();
+
+    // Create provider
+    let provider = create_provider(&request.provider, &request.api_key)
+        .map_err(|e| format!("Failed to create provider: {}", e))?;
+
+    // Create channel for streaming
+    let (tx, mut rx) = mpsc::channel::<StreamChunk>(100);
+
+    // Clone values for the spawned tasks
+    let app_for_producer = app.clone();
+    let app_for_consumer = app.clone();
+    let assistant_id_clone = assistant_message_id.clone();
+    let assistant_id_for_producer = assistant_message_id.clone();
+    let conv_id_clone = conversation_id.clone();
+    let conv_id_for_producer = conversation_id.clone();
+    let provider_clone = provider_name.clone();
+    let model_clone = model_name.clone();
+    let model_for_stream = model_name.clone();
+    let sources_clone = sources.clone();
+
+    // Spawn producer task (streams from provider to channel)
+    println!("[STREAM] Starting producer task for model: {}", model_for_stream);
+    tokio::spawn(async move {
+        println!("[STREAM] Producer task started, calling chat_stream...");
+        if let Err(e) = provider.chat_stream(provider_messages, &model_for_stream, tx).await {
+            eprintln!("[STREAM] Streaming error: {}", e);
+            // Emit error to frontend
+            let _ = app_for_producer.emit("stream-error", StreamingChunk {
+                message_id: assistant_id_for_producer,
+                conversation_id: conv_id_for_producer,
+                delta: format!("Error: {}", e),
+                done: true,
+            });
+        }
+        println!("[STREAM] Producer task completed");
+        // tx is dropped here, which will signal rx that streaming is done
+    });
+
+    // Spawn consumer task (reads from channel and emits events)
+    println!("[STREAM] Starting consumer task");
+    tokio::spawn(async move {
+        let mut full_content = String::new();
+        let mut chunk_count = 0;
+
+        println!("[STREAM] Consumer waiting for chunks...");
+        // Process chunks from receiver
+        while let Some(chunk) = rx.recv().await {
+            chunk_count += 1;
+            if !chunk.delta.is_empty() {
+                full_content.push_str(&chunk.delta);
+                println!("[STREAM] Received chunk #{}: {} chars", chunk_count, chunk.delta.len());
+                let _ = app_for_consumer.emit("stream-chunk", StreamingChunk {
+                    message_id: assistant_id_clone.clone(),
+                    conversation_id: conv_id_clone.clone(),
+                    delta: chunk.delta,
+                    done: false,
+                });
+            }
+
+            if chunk.done {
+                println!("[STREAM] Received done signal");
+                break;
+            }
+        }
+        println!("[STREAM] Consumer finished, total chunks: {}, content length: {}", chunk_count, full_content.len());
+
+        // Only save if we got content
+        if !full_content.is_empty() {
+            // Save the complete message
+            let assistant_message = Message {
+                id: assistant_id_clone.clone(),
+                conversation_id: conv_id_clone.clone(),
+                role: "assistant".to_string(),
+                content: full_content.clone(),
+                provider: provider_clone.clone(),
+                model: model_clone.clone(),
+                created_at: Utc::now().to_rfc3339(),
+                sources: sources_clone.clone(),
+            };
+
+            if let Err(e) = db::save_message(&app_for_consumer, &assistant_message).await {
+                eprintln!("Failed to save message: {}", e);
+            }
+
+            if let Err(e) = db::update_conversation_timestamp(&app_for_consumer, &conv_id_clone).await {
+                eprintln!("Failed to update timestamp: {}", e);
+            }
+        }
+
+        let _ = app_for_consumer.emit("stream-chunk", StreamingChunk {
+            message_id: assistant_id_clone.clone(),
+            conversation_id: conv_id_clone.clone(),
+            delta: String::new(),
+            done: true,
+        });
+    });
+
+    Ok(StreamStarted {
+        message_id: assistant_message_id,
+        conversation_id,
+        provider: provider_name,
+        model: model_name,
     })
 }
 

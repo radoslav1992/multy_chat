@@ -287,12 +287,18 @@ pub async fn clone_conversation(
 
     db.conversations.insert(0, conversation.clone());
 
-    for message in db.messages.iter().filter(|m| m.conversation_id == source_id) {
-        let mut cloned = message.clone();
-        cloned.id = Uuid::new_v4().to_string();
-        cloned.conversation_id = new_id.clone();
-        db.messages.push(cloned);
-    }
+    let cloned_messages: Vec<Message> = db.messages
+        .iter()
+        .filter(|m| m.conversation_id == source_id)
+        .map(|message| {
+            let mut cloned = message.clone();
+            cloned.id = Uuid::new_v4().to_string();
+            cloned.conversation_id = new_id.clone();
+            cloned
+        })
+        .collect();
+    
+    db.messages.extend(cloned_messages);
 
     save_db(app, &db)?;
     Ok(conversation)

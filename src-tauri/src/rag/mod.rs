@@ -57,19 +57,10 @@ pub async fn delete_bucket_store(app: &AppHandle, bucket_id: &str) -> Result<()>
 pub fn parse_file(path: &Path, file_type: &str) -> Result<String> {
     match file_type {
         "pdf" => {
-            let bytes = fs::read(path)?;
-            // Simple PDF text extraction using lopdf
-            let doc = lopdf::Document::load_mem(&bytes)
-                .map_err(|e| anyhow::anyhow!("PDF load error: {}", e))?;
-            
-            let mut text = String::new();
-            let pages = doc.get_pages();
-            for (page_num, _) in pages {
-                if let Ok(page_text) = doc.extract_text(&[page_num]) {
-                    text.push_str(&page_text);
-                    text.push('\n');
-                }
-            }
+            println!("[RAG] Extracting text from PDF using pdf-extract...");
+            let text = pdf_extract::extract_text(path)
+                .map_err(|e| anyhow::anyhow!("PDF extraction error: {}", e))?;
+            println!("[RAG] PDF extraction complete, got {} bytes", text.len());
             Ok(text)
         }
         "docx" => {

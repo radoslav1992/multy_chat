@@ -9,7 +9,7 @@ import {
   Pencil,
   Square,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Message } from "@/stores/chatStore";
 import { MarkdownRenderer } from "@/components/preview/MarkdownRenderer";
 import { cn, getProviderColor, getProviderIcon } from "@/lib/utils";
@@ -24,7 +24,6 @@ interface MessageBubbleProps {
   onEdit?: () => void;
   isStreaming?: boolean;
   onStopStreaming?: () => void;
-  onStreamComplete?: () => void;
   fullWidth?: boolean;
 }
 
@@ -36,12 +35,10 @@ export function MessageBubble({
   onEdit,
   isStreaming,
   onStopStreaming,
-  onStreamComplete,
   fullWidth,
 }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const [showSources, setShowSources] = useState(false);
-  const [visibleContent, setVisibleContent] = useState(message.content);
   const isUser = message.role === "user";
   const sources = message.sources ?? [];
 
@@ -50,32 +47,6 @@ export function MessageBubble({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
-  useEffect(() => {
-    if (!isStreaming || isUser) {
-      setVisibleContent(message.content);
-      return;
-    }
-
-    let cancelled = false;
-    let index = 0;
-    const content = message.content;
-    const chunkSize = 12;
-    const interval = setInterval(() => {
-      if (cancelled) return;
-      index = Math.min(index + chunkSize, content.length);
-      setVisibleContent(content.slice(0, index));
-      if (index >= content.length) {
-        clearInterval(interval);
-        onStreamComplete?.();
-      }
-    }, 20);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [isStreaming, isUser, message.content, onStreamComplete]);
 
   return (
     <motion.div
@@ -134,8 +105,16 @@ export function MessageBubble({
         >
           {isUser ? (
             <p className="whitespace-pre-wrap">{message.content}</p>
+          ) : message.content ? (
+            <MarkdownRenderer content={message.content} />
+          ) : isStreaming ? (
+            <div className="flex items-center gap-1">
+              <span className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
           ) : (
-            <MarkdownRenderer content={visibleContent} />
+            <MarkdownRenderer content={message.content} />
           )}
         </div>
 

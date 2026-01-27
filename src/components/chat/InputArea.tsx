@@ -1,10 +1,11 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Send, BookOpen, X, Sparkles, Square } from "lucide-react";
+import { Send, BookOpen, X, Sparkles, Square, Mic, MicOff } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useChatStore } from "@/stores/chatStore";
 import { useKnowledgeStore } from "@/stores/knowledgeStore";
+import { useToast } from "@/components/ui/Toaster";
 import { cn } from "@/lib/utils";
 
 const PROMPT_TEMPLATES = [
@@ -40,6 +41,10 @@ interface InputAreaProps {
   onCancelEdit?: () => void;
   isStreaming?: boolean;
   onStopStreaming?: () => void;
+  speechEnabled?: boolean;
+  speechDisabledReason?: string;
+  onTranscribe?: (wavBase64: string) => Promise<void>;
+  onRequestSettings?: () => void;
 }
 
 export function InputArea({
@@ -52,10 +57,20 @@ export function InputArea({
   onCancelEdit,
   isStreaming,
   onStopStreaming,
+  speechEnabled,
+  speechDisabledReason,
+  onTranscribe,
+  onRequestSettings,
 }: InputAreaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { selectedBucketIds, setSelectedBucketIds } = useChatStore();
   const { buckets } = useKnowledgeStore();
+  const { toast } = useToast();
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -93,6 +108,150 @@ export function InputArea({
     const nextValue = insertTemplate(template);
     onChange(nextValue);
     requestAnimationFrame(() => textareaRef.current?.focus());
+  };
+
+  const stopStreamTracks = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+  };
+
+  const audioBufferToWav = (buffer: AudioBuffer): ArrayBuffer => {
+    const numChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const samples = buffer.length;
+    const bytesPerSample = 2;
+    const blockAlign = numChannels * bytesPerSample;
+    const byteRate = sampleRate * blockAlign;
+    const dataSize = samples * blockAlign;
+    const bufferLength = 44 + dataSize;
+    const view = new DataView(new ArrayBuffer(bufferLength));
+
+    const writeString = (offset: number, str: string) => {
+      for (let i = 0; i < str.length; i += 1) {
+        view.setUint8(offset + i, str.charCodeAt(i));
+      }
+    };
+
+    writeString(0, "RIFF");
+    view.setUint32(4, 36 + dataSize, true);
+    writeString(8, "WAVE");
+    writeString(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bytesPerSample * 8, true);
+    writeString(36, "data");
+    view.setUint32(40, dataSize, true);
+
+    let offset = 44;
+    for (let i = 0; i < samples; i += 1) {
+      for (let channel = 0; channel < numChannels; channel += 1) {
+        const sample = buffer.getChannelData(channel)[i];
+        const clamped = Math.max(-1, Math.min(1, sample));
+        view.setInt16(offset, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true);
+        offset += 2;
+      }
+    }
+
+    return view.buffer;
+  };
+
+  const resampleTo16k = async (buffer: AudioBuffer): Promise<AudioBuffer> => {
+    if (buffer.sampleRate === 16000) {
+      return buffer;
+    }
+    const targetSampleRate = 16000;
+    const length = Math.ceil(buffer.duration * targetSampleRate);
+    const offline = new OfflineAudioContext(buffer.numberOfChannels, length, targetSampleRate);
+    const source = offline.createBufferSource();
+    source.buffer = buffer;
+    source.connect(offline.destination);
+    source.start(0);
+    return offline.startRendering();
+  };
+
+  const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i += 1) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  };
+
+  const startRecording = async () => {
+    if (!speechEnabled) {
+      toast({
+        title: "Speech not configured",
+        description: speechDisabledReason || "Whisper model not ready yet.",
+        variant: "destructive",
+      });
+      onRequestSettings?.();
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      chunksRef.current = [];
+
+      const preferredMime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/webm";
+      const recorder = new MediaRecorder(stream, { mimeType: preferredMime });
+      recorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        try {
+          setIsTranscribing(true);
+          const blob = new Blob(chunksRef.current, { type: recorder.mimeType });
+          const arrayBuffer = await blob.arrayBuffer();
+          const audioContext = new AudioContext();
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          const resampledBuffer = await resampleTo16k(audioBuffer);
+          const wavBuffer = audioBufferToWav(resampledBuffer);
+          const wavBase64 = arrayBufferToBase64(wavBuffer);
+          await onTranscribe?.(wavBase64);
+        } catch (error) {
+          toast({
+            title: "Transcription failed",
+            description: String(error),
+            variant: "destructive",
+          });
+        } finally {
+          setIsTranscribing(false);
+          stopStreamTracks();
+        }
+      };
+
+      recorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      toast({
+        title: "Microphone access failed",
+        description: String(error),
+        variant: "destructive",
+      });
+      stopStreamTracks();
+    }
+  };
+
+  const stopRecording = () => {
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      recorderRef.current.stop();
+    }
+    setIsRecording(false);
   };
 
   return (
@@ -205,6 +364,26 @@ export function InputArea({
 
           {/* Send Button */}
           <div className="flex items-end p-2 gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-xl flex-shrink-0"
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={disabled || isTranscribing}
+              title={
+                isRecording
+                  ? "Stop recording"
+                  : speechEnabled
+                    ? "Start voice input"
+                    : "Configure speech-to-text in settings"
+              }
+            >
+              {isRecording ? (
+                <MicOff className="h-4 w-4 text-destructive" />
+              ) : (
+                <Mic className="h-4 w-4" />
+              )}
+            </Button>
             {isStreaming && onStopStreaming && (
               <Button
                 variant="ghost"

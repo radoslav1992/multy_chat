@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Check, ChevronDown, Cpu, X, RefreshCw } from "lucide-react";
@@ -24,19 +24,29 @@ export function ModelSelector() {
     setSelectedModel,
   } = useChatStore();
   const { apiKeys } = useSettingsStore();
-  const { config, isLoading, loadModels, getModels } = useModelsStore();
+  const { config, isLoading, refreshModels, getModels } = useModelsStore();
   
   const [customModelDialogOpen, setCustomModelDialogOpen] = useState(false);
   const [customModelId, setCustomModelId] = useState("");
+  const customModelSelectedRef = useRef(false);
 
   const { getDefaultModel } = useModelsStore();
 
-  // Load models on mount
+  // Load models on mount - always refresh to get latest from remote
   useEffect(() => {
-    if (!config) {
-      loadModels();
+    refreshModels();
+  }, [refreshModels]);
+  
+  useEffect(() => {
+    if (!config) return;
+    const models = getModels(selectedProvider);
+    const defaultModel = getDefaultModel(selectedProvider);
+    const hasSelectedModel = models.some((m) => m.id === selectedModel);
+
+    if (!customModelSelectedRef.current && models.length > 0 && !hasSelectedModel && defaultModel) {
+      setSelectedModel(defaultModel);
     }
-  }, [config, loadModels]);
+  }, [config, selectedProvider, selectedModel, getModels, getDefaultModel, setSelectedModel]);
 
   const models = getModels(selectedProvider);
   const isCustomModel = models.length > 0 && !models.find((m) => m.id === selectedModel);
@@ -44,6 +54,7 @@ export function ModelSelector() {
 
   // Handle provider change - set default model for new provider
   const handleProviderChange = (provider: Provider) => {
+    customModelSelectedRef.current = false;
     setSelectedProvider(provider);
     const defaultModel = getDefaultModel(provider);
     if (defaultModel) {
@@ -55,12 +66,14 @@ export function ModelSelector() {
     if (value === "custom") {
       setCustomModelDialogOpen(true);
     } else {
+      customModelSelectedRef.current = false;
       setSelectedModel(value);
     }
   };
   
   const handleCustomModelSubmit = () => {
     if (customModelId.trim()) {
+      customModelSelectedRef.current = true;
       setSelectedModel(customModelId.trim());
       setCustomModelDialogOpen(false);
       setCustomModelId("");

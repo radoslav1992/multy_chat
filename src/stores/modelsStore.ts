@@ -5,6 +5,7 @@ import {
   loadModelsConfig,
   getModelsForProvider,
   getDefaultModelForProvider,
+  clearModelsCache,
 } from "@/services/modelsService";
 import { Provider } from "@/stores/chatStore";
 
@@ -16,6 +17,7 @@ interface ModelsState {
 
   // Actions
   loadModels: (forceRefresh?: boolean) => Promise<void>;
+  refreshModels: () => Promise<void>;
   getModels: (provider: Provider) => ModelConfig[];
   getDefaultModel: (provider: Provider) => string;
 }
@@ -39,6 +41,26 @@ export const useModelsStore = create<ModelsState>((set, get) => ({
       set({
         isLoading: false,
         error: error instanceof Error ? error.message : "Failed to load models",
+      });
+    }
+  },
+
+  refreshModels: async () => {
+    // Clear cache and force reload
+    clearModelsCache();
+    set({ config: null, isLoading: true, error: null });
+    try {
+      const config = await loadModelsConfig(true);
+      set({
+        config,
+        isLoading: false,
+        lastUpdated: config.lastUpdated,
+      });
+      console.log("[ModelsStore] Models refreshed, version:", config.version);
+    } catch (error) {
+      set({
+        isLoading: false,
+        error: error instanceof Error ? error.message : "Failed to refresh models",
       });
     }
   },
