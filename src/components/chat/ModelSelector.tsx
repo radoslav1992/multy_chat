@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Check, ChevronDown, Cpu, X, RefreshCw } from "lucide-react";
+import { Check, ChevronDown, X, RefreshCw, Zap, Bot, Sparkles, Brain } from "lucide-react";
 import { useChatStore, Provider } from "@/stores/chatStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useModelsStore } from "@/stores/modelsStore";
@@ -9,11 +9,11 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
-const PROVIDERS: { id: Provider; name: string; color: string }[] = [
-  { id: "anthropic", name: "Anthropic", color: "from-orange-500 to-amber-500" },
-  { id: "openai", name: "OpenAI", color: "from-emerald-500 to-teal-500" },
-  { id: "gemini", name: "Gemini", color: "from-blue-500 to-indigo-500" },
-  { id: "deepseek", name: "DeepSeek", color: "from-violet-500 to-purple-500" },
+const PROVIDERS: { id: Provider; name: string; color: string; icon: React.ReactNode }[] = [
+  { id: "anthropic", name: "Anthropic", color: "from-orange-500 to-amber-500", icon: <Sparkles className="h-3.5 w-3.5" /> },
+  { id: "openai", name: "OpenAI", color: "from-emerald-500 to-teal-500", icon: <Zap className="h-3.5 w-3.5" /> },
+  { id: "gemini", name: "Gemini", color: "from-blue-500 to-indigo-500", icon: <Brain className="h-3.5 w-3.5" /> },
+  { id: "deepseek", name: "DeepSeek", color: "from-violet-500 to-purple-500", icon: <Bot className="h-3.5 w-3.5" /> },
 ];
 
 export function ModelSelector() {
@@ -82,152 +82,177 @@ export function ModelSelector() {
   };
 
   return (
-    <div className="flex items-center gap-2">
-      {/* Provider Selector */}
-      <SelectPrimitive.Root
-        value={selectedProvider}
-        onValueChange={(value) => handleProviderChange(value as Provider)}
-      >
-        <SelectPrimitive.Trigger
-          className={cn(
-            "inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap",
-            "border border-border hover:border-primary/30 hover:bg-accent/50",
-            "focus:outline-none focus:ring-2 focus:ring-primary/30",
-            !apiKeys[selectedProvider] && "border-destructive/50"
-          )}
+    <div className="flex items-center">
+      {/* Unified Model Selector - Premium Design */}
+      <div className={cn(
+        "inline-flex items-center rounded-xl transition-all duration-200",
+        "bg-card border border-border/60 shadow-sm",
+        "hover:border-primary/30 hover:shadow-md"
+      )}>
+        {/* Provider Selector */}
+        <SelectPrimitive.Root
+          value={selectedProvider}
+          onValueChange={(value) => handleProviderChange(value as Provider)}
         >
-          <span
+          <SelectPrimitive.Trigger
             className={cn(
-              "w-2 h-2 rounded-full flex-shrink-0 ring-2 ring-offset-1 ring-offset-background",
-              apiKeys[selectedProvider] 
-                ? "bg-emerald-500 ring-emerald-500/30" 
-                : "bg-red-400 ring-red-400/30"
+              "inline-flex items-center gap-2 pl-3 pr-2 py-2 text-sm font-medium transition-all duration-200 whitespace-nowrap",
+              "rounded-l-xl border-r border-border/40",
+              "focus:outline-none focus:bg-accent/50",
+              "hover:bg-accent/30"
             )}
-          />
-          <SelectPrimitive.Value>
-            {currentProviderInfo?.name}
-          </SelectPrimitive.Value>
-          <SelectPrimitive.Icon>
-            <ChevronDown className="h-4 w-4 opacity-50 flex-shrink-0" />
-          </SelectPrimitive.Icon>
-        </SelectPrimitive.Trigger>
-
-        <SelectPrimitive.Portal>
-          <SelectPrimitive.Content
-            className="overflow-hidden bg-popover/95 backdrop-blur-xl border border-border rounded-xl shadow-xl z-50 animate-fade-in"
-            position="popper"
-            sideOffset={6}
           >
-            <SelectPrimitive.Viewport className="p-1.5">
-              {PROVIDERS.map((provider) => (
-                <SelectPrimitive.Item
-                  key={provider.id}
-                  value={provider.id}
-                  className={cn(
-                    "relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm cursor-pointer",
-                    "outline-none select-none transition-colors",
-                    "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "w-2 h-2 rounded-full ring-2 ring-offset-1 ring-offset-background",
-                      apiKeys[provider.id] 
-                        ? "bg-emerald-500 ring-emerald-500/30" 
-                        : "bg-red-400 ring-red-400/30"
-                    )}
-                  />
-                  <SelectPrimitive.ItemText>
-                    <span className="font-medium">{provider.name}</span>
-                  </SelectPrimitive.ItemText>
-                  <SelectPrimitive.ItemIndicator className="absolute right-3">
-                    <Check className="h-4 w-4 text-primary" />
-                  </SelectPrimitive.ItemIndicator>
-                </SelectPrimitive.Item>
-              ))}
-            </SelectPrimitive.Viewport>
-          </SelectPrimitive.Content>
-        </SelectPrimitive.Portal>
-      </SelectPrimitive.Root>
+            <div className={cn(
+              "w-6 h-6 rounded-lg flex items-center justify-center text-white",
+              "bg-gradient-to-br shadow-sm",
+              currentProviderInfo?.color
+            )}>
+              {currentProviderInfo?.icon}
+            </div>
+            <span className="hidden sm:inline">{currentProviderInfo?.name}</span>
+            <span
+              className={cn(
+                "w-1.5 h-1.5 rounded-full flex-shrink-0",
+                apiKeys[selectedProvider] 
+                  ? "bg-emerald-500" 
+                  : "bg-red-400"
+              )}
+            />
+            <SelectPrimitive.Icon>
+              <ChevronDown className="h-3.5 w-3.5 opacity-40 flex-shrink-0" />
+            </SelectPrimitive.Icon>
+          </SelectPrimitive.Trigger>
 
-      {/* Model Selector */}
-      <SelectPrimitive.Root
-        value={isCustomModel ? "custom" : selectedModel}
-        onValueChange={handleModelChange}
-      >
-        <SelectPrimitive.Trigger
-          className={cn(
-            "inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap max-w-[200px]",
-            "border border-border hover:border-primary/30 hover:bg-accent/50",
-            "focus:outline-none focus:ring-2 focus:ring-primary/30",
-            isCustomModel && "border-primary/50 bg-primary/5"
-          )}
-        >
-          <Cpu className="h-4 w-4 opacity-50 flex-shrink-0" />
-          <span className="truncate">
-            {isCustomModel ? selectedModel : (currentModel?.name || "Select model")}
-          </span>
-          <SelectPrimitive.Icon>
-            <ChevronDown className="h-4 w-4 opacity-50 flex-shrink-0" />
-          </SelectPrimitive.Icon>
-        </SelectPrimitive.Trigger>
-
-        <SelectPrimitive.Portal>
-          <SelectPrimitive.Content
-            className="overflow-hidden bg-popover/95 backdrop-blur-xl border border-border rounded-xl shadow-xl z-50 animate-fade-in min-w-[220px]"
-            position="popper"
-            sideOffset={6}
-          >
-            <SelectPrimitive.Viewport className="p-1.5">
-              {isLoading ? (
-                <div className="px-3 py-4 text-sm text-muted-foreground flex items-center justify-center gap-2">
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  Loading models...
-                </div>
-              ) : models.length === 0 ? (
-                <div className="px-3 py-4 text-sm text-muted-foreground text-center">
-                  No models available
-                </div>
-              ) : (
-                <>
-                  {models.map((model) => (
-                    <SelectPrimitive.Item
-                      key={model.id}
-                      value={model.id}
-                      className={cn(
-                        "relative flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm cursor-pointer",
-                        "outline-none select-none transition-colors",
-                        "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
-                      )}
-                    >
-                      <SelectPrimitive.ItemText>
-                        <span className="font-medium">{model.name}</span>
-                      </SelectPrimitive.ItemText>
-                      <SelectPrimitive.ItemIndicator className="absolute right-3">
-                        <Check className="h-4 w-4 text-primary" />
-                      </SelectPrimitive.ItemIndicator>
-                    </SelectPrimitive.Item>
-                  ))}
-                  {/* Custom Model Option */}
+          <SelectPrimitive.Portal>
+            <SelectPrimitive.Content
+              className="overflow-hidden bg-popover/95 backdrop-blur-xl border border-border rounded-xl shadow-xl z-50 animate-fade-in"
+              position="popper"
+              sideOffset={8}
+            >
+              <SelectPrimitive.Viewport className="p-1.5">
+                {PROVIDERS.map((provider) => (
                   <SelectPrimitive.Item
-                    value="custom"
+                    key={provider.id}
+                    value={provider.id}
                     className={cn(
-                      "relative flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm cursor-pointer",
+                      "relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm cursor-pointer",
                       "outline-none select-none transition-colors",
-                      "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground",
-                      "border-t border-border mt-1.5 pt-2.5"
+                      "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
                     )}
                   >
-                    <SelectPrimitive.ItemText>
-                      <span className="text-muted-foreground">Custom Model ID...</span>
-                    </SelectPrimitive.ItemText>
+                    <div className={cn(
+                      "w-7 h-7 rounded-lg flex items-center justify-center text-white",
+                      "bg-gradient-to-br shadow-sm",
+                      provider.color
+                    )}>
+                      {provider.icon}
+                    </div>
+                    <div className="flex-1">
+                      <SelectPrimitive.ItemText>
+                        <span className="font-medium">{provider.name}</span>
+                      </SelectPrimitive.ItemText>
+                    </div>
+                    <span
+                      className={cn(
+                        "w-2 h-2 rounded-full",
+                        apiKeys[provider.id] 
+                          ? "bg-emerald-500" 
+                          : "bg-red-400"
+                      )}
+                    />
+                    <SelectPrimitive.ItemIndicator>
+                      <Check className="h-4 w-4 text-primary" />
+                    </SelectPrimitive.ItemIndicator>
                   </SelectPrimitive.Item>
-                </>
-              )}
-            </SelectPrimitive.Viewport>
-          </SelectPrimitive.Content>
-        </SelectPrimitive.Portal>
-      </SelectPrimitive.Root>
+                ))}
+              </SelectPrimitive.Viewport>
+            </SelectPrimitive.Content>
+          </SelectPrimitive.Portal>
+        </SelectPrimitive.Root>
+
+        {/* Model Selector */}
+        <SelectPrimitive.Root
+          value={isCustomModel ? "custom" : selectedModel}
+          onValueChange={handleModelChange}
+        >
+          <SelectPrimitive.Trigger
+            className={cn(
+              "inline-flex items-center gap-2 pl-3 pr-3 py-2 text-sm font-medium transition-all duration-200 whitespace-nowrap",
+              "rounded-r-xl max-w-[180px]",
+              "focus:outline-none focus:bg-accent/50",
+              "hover:bg-accent/30",
+              isCustomModel && "text-primary"
+            )}
+          >
+            <span className="truncate text-muted-foreground">
+              {isCustomModel ? selectedModel : (currentModel?.name || "Select model")}
+            </span>
+            <SelectPrimitive.Icon>
+              <ChevronDown className="h-3.5 w-3.5 opacity-40 flex-shrink-0" />
+            </SelectPrimitive.Icon>
+          </SelectPrimitive.Trigger>
+
+          <SelectPrimitive.Portal>
+            <SelectPrimitive.Content
+              className="overflow-hidden bg-popover/95 backdrop-blur-xl border border-border rounded-xl shadow-xl z-50 animate-fade-in min-w-[240px]"
+              position="popper"
+              sideOffset={8}
+            >
+              <SelectPrimitive.Viewport className="p-1.5">
+                {isLoading ? (
+                  <div className="px-3 py-4 text-sm text-muted-foreground flex items-center justify-center gap-2">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Loading models...
+                  </div>
+                ) : models.length === 0 ? (
+                  <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                    No models available
+                  </div>
+                ) : (
+                  <>
+                    <div className="px-2.5 py-1.5 text-xs font-medium text-muted-foreground">
+                      {currentProviderInfo?.name} Models
+                    </div>
+                    {models.map((model) => (
+                      <SelectPrimitive.Item
+                        key={model.id}
+                        value={model.id}
+                        className={cn(
+                          "relative flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm cursor-pointer",
+                          "outline-none select-none transition-colors",
+                          "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+                        )}
+                      >
+                        <SelectPrimitive.ItemText>
+                          <span className="font-medium">{model.name}</span>
+                        </SelectPrimitive.ItemText>
+                        <SelectPrimitive.ItemIndicator className="absolute right-3">
+                          <Check className="h-4 w-4 text-primary" />
+                        </SelectPrimitive.ItemIndicator>
+                      </SelectPrimitive.Item>
+                    ))}
+                    {/* Custom Model Option */}
+                    <div className="border-t border-border mt-1 pt-1">
+                      <SelectPrimitive.Item
+                        value="custom"
+                        className={cn(
+                          "relative flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm cursor-pointer",
+                          "outline-none select-none transition-colors",
+                          "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+                        )}
+                      >
+                        <SelectPrimitive.ItemText>
+                          <span className="text-muted-foreground">Custom Model ID...</span>
+                        </SelectPrimitive.ItemText>
+                      </SelectPrimitive.Item>
+                    </div>
+                  </>
+                )}
+              </SelectPrimitive.Viewport>
+            </SelectPrimitive.Content>
+          </SelectPrimitive.Portal>
+        </SelectPrimitive.Root>
+      </div>
       
       {/* Custom Model Dialog */}
       <Dialog.Root open={customModelDialogOpen} onOpenChange={setCustomModelDialogOpen}>

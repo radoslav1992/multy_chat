@@ -272,18 +272,21 @@ export function Sidebar({ isOpen }: SidebarProps) {
           >
             {/* Header */}
             <div className="p-4 space-y-4">
-              {/* Logo */}
-              <div className="flex items-center gap-2 px-1">
-                <div className="w-8 h-8 rounded-xl bg-gradient-primary flex items-center justify-center shadow-md shadow-primary/20">
+              {/* Logo & New Chat */}
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-primary flex items-center justify-center shadow-md shadow-primary/20 flex-shrink-0">
                   <Sparkles className="h-4 w-4 text-white" />
                 </div>
-                <span className="font-semibold text-sm">Multi-Model Chat</span>
+                <div className="flex-1 min-w-0">
+                  <h1 className="font-semibold text-sm truncate">Multi-Model Chat</h1>
+                  <p className="text-[10px] text-muted-foreground">AI Assistant</p>
+                </div>
               </div>
 
               {/* New Chat Button */}
               <Button
                 onClick={handleNewChat}
-                className="w-full justify-center gap-2"
+                className="w-full justify-center gap-2 h-10 rounded-xl shadow-sm"
                 variant="default"
               >
                 <MessageSquarePlus className="h-4 w-4" />
@@ -471,13 +474,13 @@ export function Sidebar({ isOpen }: SidebarProps) {
             </ScrollArea>
 
             {/* Footer */}
-            <div className="p-3 border-t border-border bg-background/50">
-              <div className="flex items-center gap-2">
+            <div className="p-3 border-t border-border/50 bg-card/30">
+              <div className="flex items-center gap-1">
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                  className="flex-shrink-0"
+                  className="h-9 w-9 rounded-xl flex-shrink-0"
                   title={theme === "dark" ? "Light mode" : "Dark mode"}
                 >
                   {theme === "dark" ? (
@@ -488,7 +491,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
                 </Button>
                 <Button
                   variant="ghost"
-                  className="flex-1 justify-start gap-2"
+                  className="flex-1 justify-start gap-2 h-9 rounded-xl"
                   onClick={() => setSettingsOpen(true)}
                 >
                   <Settings className="h-4 w-4" />

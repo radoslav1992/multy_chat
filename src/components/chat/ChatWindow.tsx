@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  MessageSquare,
   Sparkles,
   AlertCircle,
   PanelLeft,
@@ -15,8 +14,11 @@ import {
   Folder,
   LayoutGrid,
   Pencil,
+  MoreHorizontal,
+  ChevronDown,
 } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { ScrollArea } from "@/components/ui/ScrollArea";
@@ -483,244 +485,336 @@ export function ChatWindow() {
   }, [messages]);
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-muted/30 to-transparent">
-      {/* Header with Model Selector */}
-      <header className="flex items-center px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-xl gap-3 min-h-[64px]">
-        <div className="flex items-center gap-3 flex-shrink-0">
+    <div className="flex flex-col h-full bg-gradient-to-b from-muted/20 to-transparent">
+      {/* Premium Header */}
+      <header className="flex items-center justify-between px-3 py-2.5 border-b border-border/40 bg-background/60 backdrop-blur-xl min-h-[56px]">
+        {/* Left Section - Sidebar Toggle */}
+        <div className="flex items-center gap-2 min-w-[140px]">
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleSidebar}
-            className={cn("rounded-xl", sidebarOpen && "bg-primary/10 text-primary")}
-            title="Toggle Chat History"
+            className={cn(
+              "h-9 w-9 rounded-xl transition-all",
+              sidebarOpen ? "bg-primary/10 text-primary" : "hover:bg-muted"
+            )}
+            title="Toggle sidebar"
           >
-            <PanelLeft className="h-5 w-5" />
+            <PanelLeft className="h-[18px] w-[18px]" />
           </Button>
-          {!sidebarOpen && (
-            <div className="flex items-center gap-2 pl-1">
-              <div className="w-7 h-7 rounded-lg bg-gradient-primary flex items-center justify-center shadow-sm shadow-primary/20">
-                <Sparkles className="h-3.5 w-3.5 text-white" />
-              </div>
-              <h1 className="font-semibold text-sm whitespace-nowrap hidden md:block">Multi-Model Chat</h1>
-            </div>
-          )}
+          
+          <AnimatePresence>
+            {!sidebarOpen && (
+              <motion.div 
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                className="flex items-center gap-2"
+              >
+                <div className="w-7 h-7 rounded-lg bg-gradient-primary flex items-center justify-center shadow-sm">
+                  <Sparkles className="h-3.5 w-3.5 text-white" />
+                </div>
+                <span className="font-semibold text-sm hidden lg:block">Multi-Model Chat</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-        <div className="flex items-center gap-1.5 flex-1 justify-end overflow-x-auto">
-          <KnowledgeSelector />
+
+        {/* Center Section - Model Selector (Hero element) */}
+        <div className="flex-1 flex justify-center px-4">
           <ModelSelector />
-          <Popover.Root open={folderPopoverOpen} onOpenChange={setFolderPopoverOpen}>
-            <Popover.Trigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                title="Set folder"
-                disabled={!currentConversationId}
-                className={currentFolder ? "text-primary" : ""}
-              >
-                <Folder className="h-5 w-5" />
-              </Button>
-            </Popover.Trigger>
-            <Popover.Portal>
-              <Popover.Content
-                className="w-72 rounded-2xl border border-border bg-popover/95 backdrop-blur-xl p-4 shadow-xl animate-fade-in"
-                sideOffset={8}
-                align="end"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-semibold">Folder</span>
-                  <button
-                    onClick={() => setFolderPopoverOpen(false)}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                {folderOptions.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    {folderOptions.map((folder) => (
-                      <button
-                        key={folder}
-                        onClick={() => handleSetFolder(folder)}
-                        className={cn(
-                          "px-2.5 py-1 rounded-lg text-xs font-medium transition-all",
-                          currentFolder === folder
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                        )}
-                      >
-                        {folder}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <div className="flex items-center gap-2 mb-2">
-                  <Input
-                    value={folderInput}
-                    onChange={(e) => setFolderInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAddFolder()}
-                    placeholder="New folder"
-                    className="h-8"
-                  />
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8"
-                    onClick={handleAddFolder}
-                    disabled={!folderInput.trim()}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-center"
-                  onClick={() => handleSetFolder(null)}
-                  disabled={!currentFolder}
-                >
-                  Clear folder
-                </Button>
-              </Popover.Content>
-            </Popover.Portal>
-          </Popover.Root>
-          <Popover.Root open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
-            <Popover.Trigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                title="Manage tags"
-                disabled={!currentConversationId}
-                className={cn("rounded-xl", currentTags.length > 0 && "text-primary")}
-              >
-                <Tag className="h-5 w-5" />
-              </Button>
-            </Popover.Trigger>
-            <Popover.Portal>
-              <Popover.Content
-                className="w-72 rounded-2xl border border-border bg-popover/95 backdrop-blur-xl p-4 shadow-xl animate-fade-in"
-                sideOffset={8}
-                align="end"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-semibold">Tags</span>
-                  <button
-                    onClick={() => setTagPopoverOpen(false)}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                {currentTags.length === 0 ? (
-                  <p className="text-xs text-muted-foreground/70 mb-3">
-                    Add tags to organize conversations.
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    {currentTags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-xs font-medium"
-                      >
-                        {tag}
-                        <button
-                          onClick={() => handleRemoveTag(tag)}
-                          className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAddTag()}
-                    placeholder="Add tag"
-                    className="h-8"
-                  />
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8"
-                    onClick={handleAddTag}
-                    disabled={!tagInput.trim()}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </Popover.Content>
-            </Popover.Portal>
-          </Popover.Root>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleFork}
-            title="Fork conversation"
-            disabled={!currentConversationId}
-            className="rounded-xl"
-          >
-            <GitBranch className="h-5 w-5" />
-          </Button>
+        </div>
+
+        {/* Right Section - Actions */}
+        <div className="flex items-center gap-1.5 min-w-[140px] justify-end">
+          {/* Knowledge Button */}
+          <KnowledgeSelector />
+          
+          {/* Compare View Toggle */}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setCompareView((prev) => !prev)}
-            title={compareView ? "Exit compare view" : "Compare view"}
-            className={cn("rounded-xl", compareView && "bg-primary/10 text-primary")}
+            title={compareView ? "Exit compare view" : "Side-by-side view"}
+            className={cn(
+              "h-9 w-9 rounded-xl transition-all",
+              compareView ? "bg-primary/10 text-primary" : "hover:bg-muted"
+            )}
           >
-            <LayoutGrid className="h-5 w-5" />
+            <LayoutGrid className="h-[18px] w-[18px]" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleCompare}
-            title="Compare with selected model"
-            disabled={!currentConversationId || !lastUserId || isLoading}
-            className="rounded-xl"
-          >
-            <GitCompare className="h-5 w-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleExport}
-            title="Export conversation"
-            disabled={!currentConversationId}
-            className="rounded-xl"
-          >
-            <Download className="h-5 w-5" />
-          </Button>
+
+          {/* More Actions Dropdown */}
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-xl hover:bg-muted"
+                title="More actions"
+              >
+                <MoreHorizontal className="h-[18px] w-[18px]" />
+              </Button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content
+                className="min-w-[200px] bg-popover/95 backdrop-blur-xl border border-border rounded-xl p-1.5 shadow-xl z-50 animate-fade-in"
+                sideOffset={8}
+                align="end"
+              >
+                {/* Organize Section */}
+                <DropdownMenu.Label className="px-2.5 py-1.5 text-xs font-medium text-muted-foreground">
+                  Organize
+                </DropdownMenu.Label>
+                
+                <DropdownMenu.Item
+                  className={cn(
+                    "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm cursor-pointer outline-none",
+                    "transition-colors hover:bg-accent focus:bg-accent",
+                    !currentConversationId && "opacity-50 pointer-events-none"
+                  )}
+                  onClick={() => currentConversationId && setFolderPopoverOpen(true)}
+                >
+                  <Folder className="h-4 w-4 text-muted-foreground" />
+                  <span>Set folder</span>
+                  {currentFolder && (
+                    <span className="ml-auto text-xs text-primary font-medium">{currentFolder}</span>
+                  )}
+                </DropdownMenu.Item>
+                
+                <DropdownMenu.Item
+                  className={cn(
+                    "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm cursor-pointer outline-none",
+                    "transition-colors hover:bg-accent focus:bg-accent",
+                    !currentConversationId && "opacity-50 pointer-events-none"
+                  )}
+                  onClick={() => currentConversationId && setTagPopoverOpen(true)}
+                >
+                  <Tag className="h-4 w-4 text-muted-foreground" />
+                  <span>Manage tags</span>
+                  {currentTags.length > 0 && (
+                    <span className="ml-auto text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-medium">
+                      {currentTags.length}
+                    </span>
+                  )}
+                </DropdownMenu.Item>
+
+                <DropdownMenu.Separator className="h-px bg-border my-1.5" />
+
+                {/* Actions Section */}
+                <DropdownMenu.Label className="px-2.5 py-1.5 text-xs font-medium text-muted-foreground">
+                  Actions
+                </DropdownMenu.Label>
+
+                <DropdownMenu.Item
+                  className={cn(
+                    "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm cursor-pointer outline-none",
+                    "transition-colors hover:bg-accent focus:bg-accent",
+                    (!currentConversationId || !lastUserId || isLoading) && "opacity-50 pointer-events-none"
+                  )}
+                  onClick={handleCompare}
+                >
+                  <GitCompare className="h-4 w-4 text-muted-foreground" />
+                  <span>Compare models</span>
+                </DropdownMenu.Item>
+
+                <DropdownMenu.Item
+                  className={cn(
+                    "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm cursor-pointer outline-none",
+                    "transition-colors hover:bg-accent focus:bg-accent",
+                    !currentConversationId && "opacity-50 pointer-events-none"
+                  )}
+                  onClick={handleFork}
+                >
+                  <GitBranch className="h-4 w-4 text-muted-foreground" />
+                  <span>Fork conversation</span>
+                </DropdownMenu.Item>
+
+                <DropdownMenu.Item
+                  className={cn(
+                    "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm cursor-pointer outline-none",
+                    "transition-colors hover:bg-accent focus:bg-accent",
+                    !currentConversationId && "opacity-50 pointer-events-none"
+                  )}
+                  onClick={handleExport}
+                >
+                  <Download className="h-4 w-4 text-muted-foreground" />
+                  <span>Export to Markdown</span>
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
+
+          {/* Knowledge Sidebar Toggle */}
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleKnowledgeSidebar}
-            className={cn("rounded-xl", knowledgeSidebarOpen && "bg-primary/10 text-primary")}
-            title="Toggle Knowledge Sidebar"
+            className={cn(
+              "h-9 w-9 rounded-xl transition-all",
+              knowledgeSidebarOpen ? "bg-primary/10 text-primary" : "hover:bg-muted"
+            )}
+            title="Knowledge panel"
           >
-            <PanelRight className="h-5 w-5" />
+            <PanelRight className="h-[18px] w-[18px]" />
           </Button>
         </div>
       </header>
 
+      {/* Folder Popover (hidden trigger) */}
+      <Popover.Root open={folderPopoverOpen} onOpenChange={setFolderPopoverOpen}>
+        <Popover.Anchor className="absolute top-14 right-4" />
+        <Popover.Portal>
+          <Popover.Content
+            className="w-72 rounded-2xl border border-border bg-popover/95 backdrop-blur-xl p-4 shadow-xl animate-fade-in z-50"
+            sideOffset={8}
+            align="end"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-semibold">Folder</span>
+              <button
+                onClick={() => setFolderPopoverOpen(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {folderOptions.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {folderOptions.map((folder) => (
+                  <button
+                    key={folder}
+                    onClick={() => handleSetFolder(folder)}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-medium transition-all",
+                      currentFolder === folder
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                    )}
+                  >
+                    {folder}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2 mb-2">
+              <Input
+                value={folderInput}
+                onChange={(e) => setFolderInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddFolder()}
+                placeholder="New folder"
+                className="h-8"
+              />
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8"
+                onClick={handleAddFolder}
+                disabled={!folderInput.trim()}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-center"
+              onClick={() => handleSetFolder(null)}
+              disabled={!currentFolder}
+            >
+              Clear folder
+            </Button>
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
+
+      {/* Tags Popover (hidden trigger) */}
+      <Popover.Root open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
+        <Popover.Anchor className="absolute top-14 right-4" />
+        <Popover.Portal>
+          <Popover.Content
+            className="w-72 rounded-2xl border border-border bg-popover/95 backdrop-blur-xl p-4 shadow-xl animate-fade-in z-50"
+            sideOffset={8}
+            align="end"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-semibold">Tags</span>
+              <button
+                onClick={() => setTagPopoverOpen(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {currentTags.length === 0 ? (
+              <p className="text-xs text-muted-foreground/70 mb-3">
+                Add tags to organize conversations.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {currentTags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-xs font-medium"
+                  >
+                    {tag}
+                    <button
+                      onClick={() => handleRemoveTag(tag)}
+                      className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <Input
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddTag()}
+                placeholder="Add tag"
+                className="h-8"
+              />
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8"
+                onClick={handleAddTag}
+                disabled={!tagInput.trim()}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
+
       {showLicenseBanner && (
-        <div className="border-b border-border bg-muted/30 px-4 py-2">
-          <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
-            <div className="text-xs text-muted-foreground">
+        <div className={cn(
+          "px-4 py-2",
+          licenseBlocked 
+            ? "bg-destructive/10 border-b border-destructive/20" 
+            : "bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border-b border-primary/10"
+        )}>
+          <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+            <p className="text-xs font-medium">
               {licenseBlocked ? (
                 <span className="text-destructive">
-                  License required to continue. Your grace period has ended.
+                  License required to continue
                 </span>
               ) : (
-                <span>
-                  Trial mode: {graceDaysRemaining} day
-                  {graceDaysRemaining === 1 ? "" : "s"} left before activation is required.
+                <span className="text-muted-foreground">
+                  Trial mode • <span className="text-foreground">{graceDaysRemaining} day{graceDaysRemaining === 1 ? "" : "s"}</span> remaining
                 </span>
               )}
-            </div>
-            <Button size="sm" onClick={() => setSettingsOpen(true)}>
-              Activate License
+            </p>
+            <Button 
+              size="sm" 
+              onClick={() => setSettingsOpen(true)}
+              className="h-7 text-xs px-3 rounded-lg"
+            >
+              Activate
             </Button>
           </div>
         </div>
