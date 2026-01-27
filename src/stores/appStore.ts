@@ -2,15 +2,16 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 export type Theme = "light" | "dark";
+export type SidebarTab = "chats" | "knowledge";
 
 interface AppState {
   theme: Theme;
   sidebarOpen: boolean;
-  knowledgeSidebarOpen: boolean;
+  sidebarTab: SidebarTab;
   settingsOpen: boolean;
   setTheme: (theme: Theme) => void;
   toggleSidebar: () => void;
-  toggleKnowledgeSidebar: () => void;
+  setSidebarTab: (tab: SidebarTab) => void;
   setSettingsOpen: (open: boolean) => void;
 }
 
@@ -19,12 +20,11 @@ export const useAppStore = create<AppState>()(
     (set) => ({
       theme: "light",
       sidebarOpen: true,
-      knowledgeSidebarOpen: false,
+      sidebarTab: "chats",
       settingsOpen: false,
       setTheme: (theme) => set({ theme }),
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
-      toggleKnowledgeSidebar: () =>
-        set((state) => ({ knowledgeSidebarOpen: !state.knowledgeSidebarOpen })),
+      setSidebarTab: (tab) => set({ sidebarTab: tab }),
       setSettingsOpen: (open) => set({ settingsOpen: open }),
     }),
     {

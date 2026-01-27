@@ -4,7 +4,6 @@ import {
   Sparkles,
   AlertCircle,
   PanelLeft,
-  PanelRight,
   Download,
   GitCompare,
   Tag,
@@ -15,7 +14,6 @@ import {
   LayoutGrid,
   Pencil,
   MoreHorizontal,
-  ChevronDown,
 } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -65,7 +63,7 @@ export function ChatWindow() {
   
   const { getApiKey, loadAllApiKeys, whisperConfig, loadWhisperConfig } = useSettingsStore();
   const { searchMultipleBuckets } = useKnowledgeStore();
-  const { setSettingsOpen, sidebarOpen, toggleSidebar, knowledgeSidebarOpen, toggleKnowledgeSidebar } = useAppStore();
+  const { setSettingsOpen, sidebarOpen, toggleSidebar } = useAppStore();
   const {
     status: licenseStatus,
     loadLicense,
@@ -644,20 +642,6 @@ export function ChatWindow() {
               </DropdownMenu.Content>
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
-
-          {/* Knowledge Sidebar Toggle */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleKnowledgeSidebar}
-            className={cn(
-              "h-9 w-9 rounded-xl transition-all",
-              knowledgeSidebarOpen ? "bg-primary/10 text-primary" : "hover:bg-muted"
-            )}
-            title="Knowledge panel"
-          >
-            <PanelRight className="h-[18px] w-[18px]" />
-          </Button>
         </div>
       </header>
 
