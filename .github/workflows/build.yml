@@ -26,7 +26,7 @@ jobs:
             name: Linux
 
     runs-on: ${{ matrix.platform }}
-    timeout-minutes: 60
+    timeout-minutes: 180
     
     steps:
       - name: Checkout repository
@@ -108,7 +108,7 @@ jobs:
 
       - name: Notarize macOS app
         if: startsWith(matrix.platform, 'macos')
-        timeout-minutes: 30
+        timeout-minutes: 120
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
@@ -120,16 +120,15 @@ jobs:
           echo "Creating ZIP for notarization..."
           ditto -c -k --keepParent "$APP_PATH" "$RUNNER_TEMP/OmniChat.zip"
           
-          echo "Submitting app for notarization (this may take 15-20 minutes)..."
+          echo "Submitting app for notarization (waiting up to 2 hours)..."
           xcrun notarytool submit "$RUNNER_TEMP/OmniChat.zip" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             --wait \
-            --timeout 20m || {
+            --timeout 2h || {
               echo "Notarization timed out or failed. Checking log..."
-              SUBMISSION_ID=$(xcrun notarytool history --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" | head -5)
-              echo "$SUBMISSION_ID"
+              xcrun notarytool history --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" | head -10
               exit 1
             }
           
@@ -152,7 +151,7 @@ jobs:
               --password "$APPLE_PASSWORD" \
               --team-id "$APPLE_TEAM_ID" \
               --wait \
-              --timeout 20m || echo "Warning: DMG notarization timed out"
+              --timeout 2h || echo "Warning: DMG notarization timed out"
             
             xcrun stapler staple "$DMG_PATH/$DMG_NAME" || echo "Warning: DMG stapling failed"
           fi
