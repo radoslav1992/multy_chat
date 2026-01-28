@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::io::Read;
+use std::sync::OnceLock;
 use tauri::AppHandle;
 use tauri::Manager;
 use serde::{Deserialize, Serialize};
@@ -9,6 +10,26 @@ use fastembed::{TextEmbedding, InitOptions, EmbeddingModel};
 
 use crate::commands::knowledge::SearchResult;
 
+// Global cache directory path - set once on first use
+static CACHE_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+/// Initialize the cache directory for embedding models
+/// This must be called with the AppHandle before using embeddings
+pub fn init_cache_dir(app: &AppHandle) -> Result<()> {
+    let app_dir = app.path().app_data_dir().map_err(|e| anyhow::anyhow!("Failed to get app data dir: {}", e))?;
+    let cache_dir = app_dir.join("models_cache");
+    
+    // Create the directory if it doesn't exist
+    fs::create_dir_all(&cache_dir)?;
+    
+    println!("[RAG] Using model cache directory: {:?}", cache_dir);
+    
+    // Set the global cache directory (only succeeds once)
+    let _ = CACHE_DIR.set(cache_dir);
+    
+    Ok(())
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 struct Chunk {
     content: String,
@@ -17,12 +38,18 @@ struct Chunk {
 }
 
 /// Create an embedding model instance
-/// The model files are cached on disk after first download (~23MB)
+/// The model files are cached in the app's data directory (~23MB)
 fn create_embedding_model(show_progress: bool) -> Result<TextEmbedding> {
     println!("[RAG] Loading local embedding model (all-MiniLM-L6-v2)...");
     
+    let cache_dir = CACHE_DIR.get()
+        .ok_or_else(|| anyhow::anyhow!("Cache directory not initialized. Call init_cache_dir first."))?;
+    
+    println!("[RAG] Using cache directory: {:?}", cache_dir);
+    
     let model = TextEmbedding::try_new(
         InitOptions::new(EmbeddingModel::AllMiniLML6V2)
+            .with_cache_dir(cache_dir.clone())
             .with_show_download_progress(show_progress)
     )?;
     

@@ -50,6 +50,11 @@ pub fn run() {
             commands::license::deactivate_license,
         ])
         .setup(|app| {
+            // Initialize the RAG cache directory for embedding models
+            if let Err(e) = rag::init_cache_dir(app.handle()) {
+                eprintln!("Failed to initialize RAG cache directory: {}", e);
+            }
+            
             // Initialize the database
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
