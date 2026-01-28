@@ -51,8 +51,20 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      - name: Build Tauri app (macOS)
-        if: startsWith(matrix.platform, 'macos')
+      - name: Build Tauri app (macOS Apple Silicon)
+        if: matrix.target == 'aarch64-apple-darwin'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: '10.15'
+          CMAKE_OSX_DEPLOYMENT_TARGET: '10.15'
+          # Enable ARM i8mm feature for whisper.cpp build
+          CFLAGS: '-march=armv8.2-a+i8mm'
+          CXXFLAGS: '-march=armv8.2-a+i8mm'
+        run: |
+          rustup target add ${{ matrix.target }}
+          npm run tauri build -- --target ${{ matrix.target }}
+
+      - name: Build Tauri app (macOS Intel)
+        if: matrix.target == 'x86_64-apple-darwin'
         env:
           MACOSX_DEPLOYMENT_TARGET: '10.15'
           CMAKE_OSX_DEPLOYMENT_TARGET: '10.15'
