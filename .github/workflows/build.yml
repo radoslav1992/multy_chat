@@ -26,6 +26,7 @@ jobs:
             name: Linux
 
     runs-on: ${{ matrix.platform }}
+    timeout-minutes: 60
     
     steps:
       - name: Checkout repository
@@ -86,7 +87,7 @@ jobs:
           CMAKE_OSX_DEPLOYMENT_TARGET: '10.15'
           CFLAGS: '-march=armv8.2-a+i8mm'
           CXXFLAGS: '-march=armv8.2-a+i8mm'
-          # Code signing only (no notarization)
+          # Code signing only - we'll notarize manually after
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
         run: |
           rustup target add ${{ matrix.target }}
@@ -97,11 +98,58 @@ jobs:
         env:
           MACOSX_DEPLOYMENT_TARGET: '10.15'
           CMAKE_OSX_DEPLOYMENT_TARGET: '10.15'
-          # Code signing only (no notarization)
+          # Code signing only - we'll notarize manually after
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
         run: |
           rustup target add ${{ matrix.target }}
           npm run tauri build -- --target ${{ matrix.target }}
+
+      - name: Notarize macOS app
+        if: startsWith(matrix.platform, 'macos')
+        timeout-minutes: 15
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          APP_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/macos/OmniChat.app"
+          DMG_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/dmg"
+          
+          echo "Creating ZIP for notarization..."
+          ditto -c -k --keepParent "$APP_PATH" "$RUNNER_TEMP/OmniChat.zip"
+          
+          echo "Submitting for notarization..."
+          xcrun notarytool submit "$RUNNER_TEMP/OmniChat.zip" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait \
+            --timeout 10m
+          
+          echo "Stapling notarization ticket..."
+          xcrun stapler staple "$APP_PATH"
+          
+          echo "Verifying notarization..."
+          spctl --assess --type exec -vvv "$APP_PATH"
+          
+          echo "Re-creating DMG with notarized app..."
+          # Find and update the DMG
+          DMG_FILE=$(find "$DMG_PATH" -name "*.dmg" | head -1)
+          if [ -n "$DMG_FILE" ]; then
+            # Remove old DMG
+            rm "$DMG_FILE"
+            # Create new DMG with notarized app
+            DMG_NAME=$(basename "$DMG_FILE")
+            hdiutil create -volname "OmniChat" -srcfolder "$APP_PATH" -ov -format UDZO "$DMG_PATH/$DMG_NAME"
+            # Notarize the DMG too
+            xcrun notarytool submit "$DMG_PATH/$DMG_NAME" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --wait \
+              --timeout 10m
+            xcrun stapler staple "$DMG_PATH/$DMG_NAME"
+          fi
 
       - name: Build Tauri app (Windows)
         if: matrix.platform == 'windows-latest'
