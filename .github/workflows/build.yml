@@ -86,11 +86,8 @@ jobs:
           CMAKE_OSX_DEPLOYMENT_TARGET: '10.15'
           CFLAGS: '-march=armv8.2-a+i8mm'
           CXXFLAGS: '-march=armv8.2-a+i8mm'
-          # Code signing
+          # Code signing only (no notarization)
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           rustup target add ${{ matrix.target }}
           npm run tauri build -- --target ${{ matrix.target }}
@@ -100,11 +97,8 @@ jobs:
         env:
           MACOSX_DEPLOYMENT_TARGET: '10.15'
           CMAKE_OSX_DEPLOYMENT_TARGET: '10.15'
-          # Code signing
+          # Code signing only (no notarization)
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           rustup target add ${{ matrix.target }}
           npm run tauri build -- --target ${{ matrix.target }}
