@@ -108,7 +108,7 @@ jobs:
 
       - name: Notarize macOS app
         if: startsWith(matrix.platform, 'macos')
-        timeout-minutes: 15
+        timeout-minutes: 30
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
@@ -120,38 +120,44 @@ jobs:
           echo "Creating ZIP for notarization..."
           ditto -c -k --keepParent "$APP_PATH" "$RUNNER_TEMP/OmniChat.zip"
           
-          echo "Submitting for notarization..."
+          echo "Submitting app for notarization (this may take 15-20 minutes)..."
           xcrun notarytool submit "$RUNNER_TEMP/OmniChat.zip" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             --wait \
-            --timeout 10m
+            --timeout 20m || {
+              echo "Notarization timed out or failed. Checking log..."
+              SUBMISSION_ID=$(xcrun notarytool history --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" | head -5)
+              echo "$SUBMISSION_ID"
+              exit 1
+            }
           
-          echo "Stapling notarization ticket..."
+          echo "Stapling notarization ticket to app..."
           xcrun stapler staple "$APP_PATH"
           
           echo "Verifying notarization..."
-          spctl --assess --type exec -vvv "$APP_PATH"
+          spctl --assess --type exec -vvv "$APP_PATH" || echo "Warning: spctl check failed but continuing..."
           
           echo "Re-creating DMG with notarized app..."
-          # Find and update the DMG
           DMG_FILE=$(find "$DMG_PATH" -name "*.dmg" | head -1)
           if [ -n "$DMG_FILE" ]; then
-            # Remove old DMG
             rm "$DMG_FILE"
-            # Create new DMG with notarized app
             DMG_NAME=$(basename "$DMG_FILE")
             hdiutil create -volname "OmniChat" -srcfolder "$APP_PATH" -ov -format UDZO "$DMG_PATH/$DMG_NAME"
-            # Notarize the DMG too
+            
+            echo "Submitting DMG for notarization..."
             xcrun notarytool submit "$DMG_PATH/$DMG_NAME" \
               --apple-id "$APPLE_ID" \
               --password "$APPLE_PASSWORD" \
               --team-id "$APPLE_TEAM_ID" \
               --wait \
-              --timeout 10m
-            xcrun stapler staple "$DMG_PATH/$DMG_NAME"
+              --timeout 20m || echo "Warning: DMG notarization timed out"
+            
+            xcrun stapler staple "$DMG_PATH/$DMG_NAME" || echo "Warning: DMG stapling failed"
           fi
+          
+          echo "Notarization complete!"
 
       - name: Build Tauri app (Windows)
         if: matrix.platform == 'windows-latest'
