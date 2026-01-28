@@ -87,13 +87,10 @@ jobs:
           CMAKE_OSX_DEPLOYMENT_TARGET: '10.15'
           CFLAGS: '-march=armv8.2-a+i8mm'
           CXXFLAGS: '-march=armv8.2-a+i8mm'
-          # Code signing only - disable Tauri's notarization
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
-          # Clear these to prevent Tauri from auto-notarizing
-          APPLE_ID: ''
-          APPLE_PASSWORD: ''
-          APPLE_TEAM_ID: ''
         run: |
+          # Unset notarization variables to prevent Tauri from auto-notarizing
+          unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
           rustup target add ${{ matrix.target }}
           npm run tauri build -- --target ${{ matrix.target }}
 
@@ -102,13 +99,10 @@ jobs:
         env:
           MACOSX_DEPLOYMENT_TARGET: '10.15'
           CMAKE_OSX_DEPLOYMENT_TARGET: '10.15'
-          # Code signing only - disable Tauri's notarization
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
-          # Clear these to prevent Tauri from auto-notarizing
-          APPLE_ID: ''
-          APPLE_PASSWORD: ''
-          APPLE_TEAM_ID: ''
         run: |
+          # Unset notarization variables to prevent Tauri from auto-notarizing
+          unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
           rustup target add ${{ matrix.target }}
           npm run tauri build -- --target ${{ matrix.target }}
 
