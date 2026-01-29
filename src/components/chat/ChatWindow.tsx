@@ -15,7 +15,6 @@ import {
   Pencil,
   MoreHorizontal,
 } from "lucide-react";
-import * as Popover from "@radix-ui/react-popover";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
@@ -80,10 +79,6 @@ export function ChatWindow() {
   const [folderInput, setFolderInput] = useState("");
   const [folderPopoverOpen, setFolderPopoverOpen] = useState(false);
   const [compareView, setCompareView] = useState(false);
-  
-  // Track when popovers were opened to prevent immediate auto-close
-  const folderPopoverOpenedAt = useRef<number>(0);
-  const tagPopoverOpenedAt = useRef<number>(0);
 
   const currentConversation = conversations.find(
     (conversation) => conversation.id === currentConversationId
@@ -579,10 +574,7 @@ export function ChatWindow() {
                     e.preventDefault();
                     if (currentConversationId) {
                       // Small delay to ensure dropdown closes first
-                      setTimeout(() => {
-                        folderPopoverOpenedAt.current = Date.now();
-                        setFolderPopoverOpen(true);
-                      }, 150);
+                      setTimeout(() => setFolderPopoverOpen(true), 100);
                     }
                   }}
                 >
@@ -603,10 +595,7 @@ export function ChatWindow() {
                     e.preventDefault();
                     if (currentConversationId) {
                       // Small delay to ensure dropdown closes first
-                      setTimeout(() => {
-                        tagPopoverOpenedAt.current = Date.now();
-                        setTagPopoverOpen(true);
-                      }, 150);
+                      setTimeout(() => setTagPopoverOpen(true), 100);
                     }
                   }}
                 >
@@ -668,157 +657,137 @@ export function ChatWindow() {
       </header>
 
       {/* Folder Popover (hidden trigger) */}
-      <Popover.Root open={folderPopoverOpen} onOpenChange={setFolderPopoverOpen}>
-        <Popover.Anchor className="absolute top-14 right-4" />
-        <Popover.Portal>
-          <Popover.Content
-            className="w-72 rounded-2xl border border-border bg-popover/95 backdrop-blur-xl p-4 shadow-xl animate-fade-in z-50"
-            sideOffset={8}
-            align="end"
-            onInteractOutside={(e) => {
-              // Prevent closing if the popover was just opened (within 300ms)
-              if (Date.now() - folderPopoverOpenedAt.current < 300) {
-                e.preventDefault();
-              }
-            }}
-            onPointerDownOutside={(e) => {
-              // Prevent closing if the popover was just opened (within 300ms)
-              if (Date.now() - folderPopoverOpenedAt.current < 300) {
-                e.preventDefault();
-              }
-            }}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold">Folder</span>
-              <button
-                onClick={() => setFolderPopoverOpen(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            {folderOptions.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {folderOptions.map((folder) => (
-                  <button
-                    key={folder}
-                    onClick={() => handleSetFolder(folder)}
-                    className={cn(
-                      "px-2.5 py-1 rounded-lg text-xs font-medium transition-all",
-                      currentFolder === folder
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                    )}
-                  >
-                    {folder}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="flex items-center gap-2 mb-2">
-              <Input
-                value={folderInput}
-                onChange={(e) => setFolderInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAddFolder()}
-                placeholder="New folder"
-                className="h-8"
-              />
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                onClick={handleAddFolder}
-                disabled={!folderInput.trim()}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-center"
-              onClick={() => handleSetFolder(null)}
-              disabled={!currentFolder}
+      {folderPopoverOpen && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={() => setFolderPopoverOpen(false)}
+        />
+      )}
+      {folderPopoverOpen && (
+        <div
+          className="fixed top-14 right-4 w-72 rounded-2xl border border-border bg-popover/95 backdrop-blur-xl p-4 shadow-xl animate-fade-in z-50"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold">Folder</span>
+            <button
+              onClick={() => setFolderPopoverOpen(false)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
             >
-              Clear folder
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          {folderOptions.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {folderOptions.map((folder) => (
+                <button
+                  key={folder}
+                  onClick={() => handleSetFolder(folder)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-xs font-medium transition-all",
+                    currentFolder === folder
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                  )}
+                >
+                  {folder}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center gap-2 mb-2">
+            <Input
+              value={folderInput}
+              onChange={(e) => setFolderInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAddFolder()}
+              placeholder="New folder"
+              className="h-8"
+            />
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              onClick={handleAddFolder}
+              disabled={!folderInput.trim()}
+            >
+              <Plus className="h-4 w-4" />
             </Button>
-          </Popover.Content>
-        </Popover.Portal>
-      </Popover.Root>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-center"
+            onClick={() => handleSetFolder(null)}
+            disabled={!currentFolder}
+          >
+            Clear folder
+          </Button>
+        </div>
+      )}
 
       {/* Tags Popover (hidden trigger) */}
-      <Popover.Root open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
-        <Popover.Anchor className="absolute top-14 right-4" />
-        <Popover.Portal>
-          <Popover.Content
-            className="w-72 rounded-2xl border border-border bg-popover/95 backdrop-blur-xl p-4 shadow-xl animate-fade-in z-50"
-            sideOffset={8}
-            align="end"
-            onInteractOutside={(e) => {
-              // Prevent closing if the popover was just opened (within 300ms)
-              if (Date.now() - tagPopoverOpenedAt.current < 300) {
-                e.preventDefault();
-              }
-            }}
-            onPointerDownOutside={(e) => {
-              // Prevent closing if the popover was just opened (within 300ms)
-              if (Date.now() - tagPopoverOpenedAt.current < 300) {
-                e.preventDefault();
-              }
-            }}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold">Tags</span>
-              <button
-                onClick={() => setTagPopoverOpen(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            {currentTags.length === 0 ? (
-              <p className="text-xs text-muted-foreground/70 mb-3">
-                Add tags to organize conversations.
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {currentTags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-xs font-medium"
+      {tagPopoverOpen && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={() => setTagPopoverOpen(false)}
+        />
+      )}
+      {tagPopoverOpen && (
+        <div
+          className="fixed top-14 right-4 w-72 rounded-2xl border border-border bg-popover/95 backdrop-blur-xl p-4 shadow-xl animate-fade-in z-50"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold">Tags</span>
+            <button
+              onClick={() => setTagPopoverOpen(false)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          {currentTags.length === 0 ? (
+            <p className="text-xs text-muted-foreground/70 mb-3">
+              Add tags to organize conversations.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {currentTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-xs font-medium"
+                >
+                  {tag}
+                  <button
+                    onClick={() => handleRemoveTag(tag)}
+                    className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
                   >
-                    {tag}
-                    <button
-                      onClick={() => handleRemoveTag(tag)}
-                      className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <Input
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAddTag()}
-                placeholder="Add tag"
-                className="h-8"
-              />
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                onClick={handleAddTag}
-                disabled={!tagInput.trim()}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
             </div>
-          </Popover.Content>
-        </Popover.Portal>
-      </Popover.Root>
+          )}
+          <div className="flex items-center gap-2">
+            <Input
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAddTag()}
+              placeholder="Add tag"
+              className="h-8"
+            />
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              onClick={handleAddTag}
+              disabled={!tagInput.trim()}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {showLicenseBanner && (
         <div className={cn(
