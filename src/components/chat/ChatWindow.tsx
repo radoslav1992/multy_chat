@@ -80,6 +80,10 @@ export function ChatWindow() {
   const [folderInput, setFolderInput] = useState("");
   const [folderPopoverOpen, setFolderPopoverOpen] = useState(false);
   const [compareView, setCompareView] = useState(false);
+  
+  // Track when popovers were opened to prevent immediate auto-close
+  const folderPopoverOpenedAt = useRef<number>(0);
+  const tagPopoverOpenedAt = useRef<number>(0);
 
   const currentConversation = conversations.find(
     (conversation) => conversation.id === currentConversationId
@@ -575,7 +579,10 @@ export function ChatWindow() {
                     e.preventDefault();
                     if (currentConversationId) {
                       // Small delay to ensure dropdown closes first
-                      setTimeout(() => setFolderPopoverOpen(true), 100);
+                      setTimeout(() => {
+                        folderPopoverOpenedAt.current = Date.now();
+                        setFolderPopoverOpen(true);
+                      }, 150);
                     }
                   }}
                 >
@@ -596,7 +603,10 @@ export function ChatWindow() {
                     e.preventDefault();
                     if (currentConversationId) {
                       // Small delay to ensure dropdown closes first
-                      setTimeout(() => setTagPopoverOpen(true), 100);
+                      setTimeout(() => {
+                        tagPopoverOpenedAt.current = Date.now();
+                        setTagPopoverOpen(true);
+                      }, 150);
                     }
                   }}
                 >
@@ -665,6 +675,18 @@ export function ChatWindow() {
             className="w-72 rounded-2xl border border-border bg-popover/95 backdrop-blur-xl p-4 shadow-xl animate-fade-in z-50"
             sideOffset={8}
             align="end"
+            onInteractOutside={(e) => {
+              // Prevent closing if the popover was just opened (within 300ms)
+              if (Date.now() - folderPopoverOpenedAt.current < 300) {
+                e.preventDefault();
+              }
+            }}
+            onPointerDownOutside={(e) => {
+              // Prevent closing if the popover was just opened (within 300ms)
+              if (Date.now() - folderPopoverOpenedAt.current < 300) {
+                e.preventDefault();
+              }
+            }}
           >
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-semibold">Folder</span>
@@ -732,6 +754,18 @@ export function ChatWindow() {
             className="w-72 rounded-2xl border border-border bg-popover/95 backdrop-blur-xl p-4 shadow-xl animate-fade-in z-50"
             sideOffset={8}
             align="end"
+            onInteractOutside={(e) => {
+              // Prevent closing if the popover was just opened (within 300ms)
+              if (Date.now() - tagPopoverOpenedAt.current < 300) {
+                e.preventDefault();
+              }
+            }}
+            onPointerDownOutside={(e) => {
+              // Prevent closing if the popover was just opened (within 300ms)
+              if (Date.now() - tagPopoverOpenedAt.current < 300) {
+                e.preventDefault();
+              }
+            }}
           >
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-semibold">Tags</span>
