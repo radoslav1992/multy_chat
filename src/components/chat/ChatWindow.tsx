@@ -571,7 +571,13 @@ export function ChatWindow() {
                     "transition-colors hover:bg-accent focus:bg-accent",
                     !currentConversationId && "opacity-50 pointer-events-none"
                   )}
-                  onClick={() => currentConversationId && setFolderPopoverOpen(true)}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (currentConversationId) {
+                      // Small delay to ensure dropdown closes first
+                      setTimeout(() => setFolderPopoverOpen(true), 100);
+                    }
+                  }}
                 >
                   <Folder className="h-4 w-4 text-muted-foreground" />
                   <span>Set folder</span>
@@ -586,7 +592,13 @@ export function ChatWindow() {
                     "transition-colors hover:bg-accent focus:bg-accent",
                     !currentConversationId && "opacity-50 pointer-events-none"
                   )}
-                  onClick={() => currentConversationId && setTagPopoverOpen(true)}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (currentConversationId) {
+                      // Small delay to ensure dropdown closes first
+                      setTimeout(() => setTagPopoverOpen(true), 100);
+                    }
+                  }}
                 >
                   <Tag className="h-4 w-4 text-muted-foreground" />
                   <span>Manage tags</span>
