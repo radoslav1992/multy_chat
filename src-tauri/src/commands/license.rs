@@ -4,7 +4,7 @@ const LEMON_SQUEEZY_ACTIVATE_URL: &str = "https://api.lemonsqueezy.com/v1/licens
 const LEMON_SQUEEZY_DEACTIVATE_URL: &str = "https://api.lemonsqueezy.com/v1/licenses/deactivate";
 const OMNICHAT_PRODUCT_ID: u64 = 795978;
 const GUMROAD_VERIFY_URL: &str = "https://api.gumroad.com/v2/licenses/verify";
-const GUMROAD_PRODUCT_ID: &str = ""; // TODO: set Gumroad product ID.
+const GUMROAD_PRODUCT_ID: &str = "pWSi7SoBebZwJybZqF2s3g==";
 const GUMROAD_INSTANCE_PREFIX: &str = "gumroad:";
 
 #[derive(Debug, Serialize)]
